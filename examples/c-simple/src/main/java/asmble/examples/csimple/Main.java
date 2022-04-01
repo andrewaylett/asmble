@@ -2,7 +2,7 @@ package asmble.examples.csimple;
 
 import java.lang.invoke.MethodHandle;
 
-import asmble.generated.CSimple;
+import eu.aylett.asmble.generated.CSimple;
 
 class Main {
     public static void main(String[] args) {

@@ -1,6 +1,6 @@
 package asmble.examples.ruststring;
 
-import asmble.generated.RustString;
+import eu.aylett.asmble.generated.RustString;
 
 import java.io.IOException;
 import java.io.InputStream;

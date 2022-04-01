@@ -1,6 +1,6 @@
 package asmble.examples.rustregex;
 
-import asmble.generated.RustRegex;
+import eu.aylett.asmble.generated.RustRegex;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

@@ -1,7 +1,7 @@
 package asmble.examples.gosimple;
 
-import asmble.examples.goutil.Executor;
-import asmble.generated.GoSimple;
+import eu.aylett.asmble.examples.goutil.Executor;
+import eu.aylett.asmble.generated.GoSimple;
 
 public class Main {
   public static void main(String[] args) {

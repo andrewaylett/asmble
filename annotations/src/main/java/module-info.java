@@ -1,3 +1,4 @@
 open module asmble.annotations {
-    exports asmble.annotation;
+    exports eu.aylett.asmble.annotation;
+    requires kotlin.stdlib;
 }

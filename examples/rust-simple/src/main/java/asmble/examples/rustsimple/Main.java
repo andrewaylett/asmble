@@ -1,6 +1,6 @@
 package asmble.examples.rustsimple;
 
-import asmble.generated.RustSimple;
+import eu.aylett.asmble.generated.RustSimple;
 
 class Main {
     // 20 pages is good for now
