@@ -13,6 +13,6 @@ sealed class SExpr {
     ) : SExpr() {
         override fun toString() = SExprToStr.Compact.fromSExpr(this)
         // This is basically the same as the deprecated java.lang.String#getBytes
-        fun rawContentCharsToBytes() = contents.toCharArray().map(Char::toByte)
+        fun rawContentCharsToBytes() = contents.toCharArray().map { it.code.toByte() }
     }
 }

@@ -46,8 +46,13 @@ data class ClsContext(
                 export.kind == Node.ExternalKind.FUNCTION -> listOf(export.field.javaIdent)
                 // Just to make it easy, consider all globals as having setters
                 export.kind == Node.ExternalKind.GLOBAL ->
-                    export.field.javaIdent.capitalize().let { listOf("get$it", "set$it") }
-                else -> listOf("get" + export.field.javaIdent.capitalize())
+                    export.field.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                        .let { listOf("get$it", "set$it") }
+                else -> listOf("get" + export.field.javaIdent.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(
+                        Locale.getDefault()
+                    ) else it.toString()
+                })
             }
         }.toMutableSet()
         mod.names?.funcNames?.toList()?.sortedBy { it.first }?.map { (index, origName) ->
@@ -97,7 +102,7 @@ data class ClsContext(
     ): MethodInsnNode {
         val name = "\$\$$nameSuffix"
         val method =
-            cls.methods.find { (it as MethodNode).name == name }?.let { it as MethodNode } ?:
+            cls.methods.find { (it as MethodNode).name == name }?.let { it } ?:
                 fn(syntheticFuncBuilder, this, name).also { cls.methods.add(it) }
         return MethodInsnNode(Opcodes.INVOKESTATIC, thisRef.asmName, method.name, method.desc, false)
     }

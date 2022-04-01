@@ -4,12 +4,13 @@ import asmble.AsmErr
 import java.lang.invoke.WrongMethodTypeException
 import java.nio.BufferOverflowException
 import java.nio.charset.MalformedInputException
+import java.util.*
 
 open class ExceptionTranslator {
     fun translate(ex: Throwable): List<String> = when (ex) {
         is ArithmeticException -> when (ex.message) {
             "/ by zero", "BigInteger divide by zero" -> listOf("integer divide by zero")
-            else -> listOf(ex.message!!.decapitalize())
+            else -> listOf(ex.message!!.replaceFirstChar { it.lowercase(Locale.getDefault()) })
         }
         is ArrayIndexOutOfBoundsException ->
             listOf("out of bounds memory access", "undefined element", "elements segment does not fit")

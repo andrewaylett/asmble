@@ -10,6 +10,7 @@ import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.reflect.Constructor
 import java.lang.reflect.Modifier
+import java.util.*
 
 interface Module {
     val name: String?
@@ -51,16 +52,32 @@ interface Module {
 
         override fun exportedFunc(field: String) = bindMethod(field, WasmExternalKind.FUNCTION, field.javaIdent)
         override fun exportedGlobal(field: String) =
-            bindMethod(field, WasmExternalKind.GLOBAL, "get" + field.javaIdent.capitalize(), 0)?.let {
-                it to bindMethod(field, WasmExternalKind.GLOBAL, "set" + field.javaIdent.capitalize(), 1)
+            bindMethod(field, WasmExternalKind.GLOBAL, "get" + field.javaIdent.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                    Locale.getDefault()
+                ) else it.toString()
+            }, 0)?.let {
+                it to bindMethod(field, WasmExternalKind.GLOBAL, "set" + field.javaIdent.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(
+                        Locale.getDefault()
+                    ) else it.toString()
+                }, 1)
             }
         @SuppressWarnings("UNCHECKED_CAST")
         override fun <T> exportedMemory(field: String, memClass: Class<T>) =
-            bindMethod(field, WasmExternalKind.MEMORY, "get" + field.javaIdent.capitalize(), 0)?.
+            bindMethod(field, WasmExternalKind.MEMORY, "get" + field.javaIdent.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                    Locale.getDefault()
+                ) else it.toString()
+            }, 0)?.
                 takeIf { it.type().returnType() == memClass }?.let { it.invokeWithArguments() as? T }
         @SuppressWarnings("UNCHECKED_CAST")
         override fun exportedTable(field: String) =
-            bindMethod(field, WasmExternalKind.TABLE, "get" + field.javaIdent.capitalize(), 0)?.
+            bindMethod(field, WasmExternalKind.TABLE, "get" + field.javaIdent.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                    Locale.getDefault()
+                ) else it.toString()
+            }, 0)?.
                 let { it.invokeWithArguments() as? Array<MethodHandle?> }
     }
 

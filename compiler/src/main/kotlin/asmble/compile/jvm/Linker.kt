@@ -9,6 +9,7 @@ import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.*
 import java.lang.invoke.MethodHandle
+import java.util.*
 
 open class Linker {
 
@@ -75,7 +76,7 @@ open class Linker {
         val params = mod.importClasses(ctx)
         var func = Func(
             access = Opcodes.ACC_PROTECTED,
-            name = "create" + mod.name.javaIdent.capitalize(),
+            name = "create" + mod.name.javaIdent.replaceFirstChar { it.titlecase(Locale.getDefault()) },
             params = params.map(ModuleClass::ref),
             ret = mod.ref
         )
@@ -161,7 +162,11 @@ open class Linker {
     fun addInstanceField(ctx: Context, mod: ModuleClass) {
         // Simple protected field  that is lazily populated (but doesn't need to be volatile)
         ctx.cls.fields.plusAssign(
-            FieldNode(Opcodes.ACC_PROTECTED, "instance" + mod.name.javaIdent.capitalize(),
+            FieldNode(Opcodes.ACC_PROTECTED, "instance" + mod.name.javaIdent.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                    Locale.getDefault()
+                ) else it.toString()
+            },
                 mod.ref.asmDesc, null, null)
         )
     }
@@ -181,7 +186,7 @@ open class Linker {
         func = func.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
             FieldInsnNode(Opcodes.GETFIELD, ctx.cls.name,
-                "instance" + mod.name.javaIdent.capitalize(), mod.ref.asmDesc),
+                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }, mod.ref.asmDesc),
             JumpInsnNode(Opcodes.IFNONNULL, alreadyThereLabel),
             VarInsnNode(Opcodes.ALOAD, 0)
         )
@@ -194,18 +199,18 @@ open class Linker {
         }
         func = func.addInsns(
             FieldInsnNode(Opcodes.PUTFIELD, ctx.cls.name,
-                "instance" + mod.name.javaIdent.capitalize(), mod.ref.asmDesc),
+                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }, mod.ref.asmDesc),
             alreadyThereLabel,
             VarInsnNode(Opcodes.ALOAD, 0),
             FieldInsnNode(Opcodes.GETFIELD, ctx.cls.name,
-                "instance" + mod.name.javaIdent.capitalize(), mod.ref.asmDesc),
+                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }, mod.ref.asmDesc),
             InsnNode(Opcodes.ARETURN)
         )
         ctx.cls.methods.plusAssign(func.toMethodNode())
     }
 
     class ModuleClass(val cls: Class<*>, overrideName: String? = null) {
-        val name = overrideName ?:
+        val name: String = overrideName ?:
             cls.getDeclaredAnnotation(WasmModule::class.java)?.name ?: error("No module name available for class $cls")
         val ref = TypeRef(Type.getType(cls))
 

@@ -82,7 +82,7 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
     }
 
     fun getOrCreateGrowMemoryMethod(ctx: FuncContext, func: Func): MethodNode =
-        ctx.cls.cls.methods.find { (it as? MethodNode)?.name == "\$\$growMemory" }?.let { it as MethodNode } ?: run {
+        ctx.cls.cls.methods.find { it?.name == "\$\$growMemory" }?.let { it } ?: run {
             val okLim = LabelNode()
             val node = MethodNode(
                 Opcodes.ACC_PRIVATE + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,

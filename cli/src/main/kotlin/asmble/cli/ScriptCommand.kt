@@ -60,7 +60,8 @@ abstract class ScriptCommand<T> : Command<T>() {
                     else -> Translate.inToAst(inFile, inFile.substringAfterLast('.')).let { inAst ->
                         val (mod, name) = (inAst.commands.singleOrNull() as? Script.Cmd.Module) ?:
                             error("Input file must only contain a single module")
-                        val className = name?.javaIdent?.capitalize() ?:
+                        val className = name?.javaIdent?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                            ?:
                             "Temp" + UUID.randomUUID().toString().replace("-", "")
                         ctx.withBuiltModule(mod, className, name).let { ctx ->
                             if (name == null && index != args.inFiles.size - 1)

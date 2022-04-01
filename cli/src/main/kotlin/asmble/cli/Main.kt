@@ -1,6 +1,7 @@
 package asmble.cli
 
 import asmble.util.Logger
+import java.util.*
 import kotlin.system.exitProcess
 
 val commands = listOf(Compile, Help, Invoke, Link, Run, Translate)
@@ -43,10 +44,10 @@ object Main {
         logLevel = bld.arg(
             name = "logLevel",
             opt = "log",
-            desc = "One of: ${Logger.Level.values().map { it.name.toLowerCase() }.joinToString()}.",
+            desc = "One of: ${Logger.Level.values().map { it.name.lowercase(Locale.getDefault()) }.joinToString()}.",
             default = "warn",
             lowPriority = true
-        ).let { Logger.Level.valueOf(it.toUpperCase()) }
+        ).let { Logger.Level.valueOf(it.uppercase(Locale.getDefault())) }
     )
 
     data class GlobalArgs(

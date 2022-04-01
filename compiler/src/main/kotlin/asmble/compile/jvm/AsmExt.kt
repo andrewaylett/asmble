@@ -146,7 +146,7 @@ val String.javaIdent: String get() {
             (if (this.first().isJavaIdentifierStart()) this else "wasm\$$this").
                 fold(StringBuilder()) { builder, char ->
                     if (char.isJavaIdentifierPart()) builder.append(char)
-                    else builder.append('_').append(char.toInt())
+                    else builder.append('_').append(char.code)
                 }.toString()
         }
 }
@@ -157,7 +157,7 @@ fun Node.Func.localByIndex(index: Int) =
             throw CompileErr.UnknownLocal(index)
 fun Node.Func.actualLocalIndex(givenIndex: Int) =
     // Add 1 for "this"
-    (this.type.params + this.locals).take(givenIndex).sumBy { it.typeRef.stackSize } + 1
+    (this.type.params + this.locals).take(givenIndex).sumOf { it.typeRef.stackSize } + 1
 val Node.Func.localsSize: Int get() = this.type.params.size + this.locals.size
 
 val Node.Type.Value.kclass: KClass<*> get() = when (this) {

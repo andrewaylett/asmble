@@ -24,7 +24,7 @@ open class SExprToStr(val depthBeforeNewline: Int, val countBeforeNewlineAll: In
                     else if (it == '\t') "\\t"
                     else if (it == ' ') " "
                     else if (!it.requiresQuote) it.toString()
-                    else "\\" + (it.toInt() and 0xFF).toString(16).let { if (it.length < 2) "0$it" else it }
+                    else "\\" + (it.code and 0xFF).toString(16).let { if (it.length < 2) "0$it" else it }
                 )
             }
             sb.append('"')
@@ -42,7 +42,7 @@ open class SExprToStr(val depthBeforeNewline: Int, val countBeforeNewlineAll: In
 
     @Suppress("UNCHECKED_CAST")
     fun <T : Appendable> appendAll(exps: List<SExpr>, sb: T = StringBuilder() as T, indentLevel: Int = 0): T {
-        val newlineAll = exps.sumBy { it.count() } >= countBeforeNewlineAll
+        val newlineAll = exps.sumOf { it.count() } >= countBeforeNewlineAll
         var wasLastNewline = false
         exps.forEachIndexed { index, sub ->
             // No matter what, if the first is a symbol
@@ -71,7 +71,7 @@ open class SExprToStr(val depthBeforeNewline: Int, val countBeforeNewlineAll: In
 
     fun SExpr.count(): Int = when(this) {
         is SExpr.Symbol -> 1
-        is SExpr.Multi -> this.vals.sumBy { it.count() }
+        is SExpr.Multi -> this.vals.sumOf { it.count() }
     }
 
     fun SExpr.maxDepth(): Int = when(this) {

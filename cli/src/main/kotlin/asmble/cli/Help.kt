@@ -19,14 +19,14 @@ open class Help : Command<Help.Args>() {
         command.args(argDefBld)
 
         val out = StringBuilder()
-        out.appendln("Command: ${command.name}")
-        out.appendln("Description: ${command.desc}")
-        out.appendln("Usage:")
+        out.appendLine("Command: ${command.name}")
+        out.appendLine("Description: ${command.desc}")
+        out.appendLine("Usage:")
         out.append("  ${command.name} ")
         argDefBld.argDefs.forEach { if (!it.lowPriority) it.argString(out).append(' ') }
-        out.appendln().appendln()
+        out.appendLine().appendLine()
         out.append("Args:")
-        argDefBld.argDefs.sorted().forEach { out.appendln().append("  ").let(it::descString) }
+        argDefBld.argDefs.sorted().forEach { out.appendLine().append("  ").let(it::descString) }
         println(out)
     }
 
