@@ -76,7 +76,7 @@ open class SExprToStr(val depthBeforeNewline: Int, val countBeforeNewlineAll: In
 
     fun SExpr.maxDepth(): Int = when(this) {
         is SExpr.Symbol -> 0
-        is SExpr.Multi -> 1 + (this.vals.map { it.maxDepth() }.max() ?: 0)
+        is SExpr.Multi -> 1 + (this.vals.maxOfOrNull { it.maxDepth() } ?: 0)
     }
 
     companion object : SExprToStr(depthBeforeNewline = 3, countBeforeNewlineAll = 10, indent = "  ") {

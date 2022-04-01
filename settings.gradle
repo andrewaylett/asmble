@@ -1,9 +1,0 @@
-rootProject.name = 'asmble'
-include 'annotations',
-        'compiler',
-        'examples:c-simple',
-        'examples:go-simple',
-        'examples:go-util',
-        'examples:rust-regex',
-        'examples:rust-simple',
-        'examples:rust-string'
