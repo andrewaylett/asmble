@@ -53,17 +53,17 @@ abstract class ScriptCommand<T> : Command<T>() {
         )
         var ctx = ScriptContext(logger = logger, builder = builder)
         // Compile everything
-        ctx = args.inFiles.foldIndexed(ctx) { index, ctx, inFile ->
+        ctx = args.inFiles.foldIndexed(ctx) { index, ctxx, inFile ->
             try {
                 when (inFile.substringAfterLast('.')) {
-                    "class" -> builder.classLoader.addClass(File(inFile).readBytes()).let { ctx }
+                    "class" -> builder.classLoader.addClass(File(inFile).readBytes()).let { ctxx }
                     else -> Translate.inToAst(inFile, inFile.substringAfterLast('.')).let { inAst ->
                         val (mod, name) = (inAst.commands.singleOrNull() as? Script.Cmd.Module) ?:
                             error("Input file must only contain a single module")
-                        val className = name?.javaIdent?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-                            ?:
-                            "Temp" + UUID.randomUUID().toString().replace("-", "")
-                        ctx.withBuiltModule(mod, className, name).let { ctx ->
+                        val className =
+                            name?.javaIdent?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                                ?: ("Temp" + UUID.randomUUID().toString().replace("-", ""))
+                        ctxx.withBuiltModule(mod, className, name).let { ctx ->
                             if (name == null && index != args.inFiles.size - 1)
                                 logger.warn { "File '$inFile' not last and has no name so will be unused" }
                             if (name == null || args.disableAutoRegister) ctx
@@ -74,8 +74,9 @@ abstract class ScriptCommand<T> : Command<T>() {
             } catch (e: Exception) { throw Exception("Failed loading $inFile - ${e.message}", e) }
         }
         // Do registrations
-        ctx = args.registrations.fold(ctx) { ctx, (moduleName, className) ->
-            ctx.withModuleRegistered(
+        ctx = args.registrations.fold(ctx) { ctxx, (moduleName, className) ->
+            @Suppress("DEPRECATION")
+            ctxx.withModuleRegistered(
                 Module.Native(moduleName, Class.forName(className, true, builder.classLoader).newInstance()))
         }
         if (args.specTestRegister) ctx = ctx.withHarnessRegistered()

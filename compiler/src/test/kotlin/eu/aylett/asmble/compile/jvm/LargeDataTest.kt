@@ -35,7 +35,7 @@ class LargeDataTest : TestBase() {
         val cls = ModuleBuilder.Compiled.SimpleClassLoader(javaClass.classLoader, logger).fromBuiltContext(ctx)
         // Instantiate it, get the memory out, and check it
         val field = cls.getDeclaredField("memory").apply { isAccessible = true }
-        val buf = field[cls.newInstance()] as ByteBuffer
+        @Suppress("DEPRECATION") val buf = field[cls.newInstance()] as ByteBuffer
         // Grab all + 1 and check values
         val bytesActual = ByteArray(70001).also { buf.get(0, it) }
         bytesActual.forEachIndexed { index, byte ->

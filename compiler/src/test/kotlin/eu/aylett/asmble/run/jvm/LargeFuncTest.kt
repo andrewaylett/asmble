@@ -54,11 +54,11 @@ class LargeFuncTest : TestBase() {
             ModuleBuilder.Compiled.SimpleClassLoader(javaClass.classLoader, logger, splitWhenTooLarge = false).
                 fromBuiltContext(ctx)
             Assert.fail()
-        } catch (e: MethodTooLargeException) { }
+        } catch (_: MethodTooLargeException) { }
         // Try again with split
         val cls = ModuleBuilder.Compiled.SimpleClassLoader(javaClass.classLoader, logger).fromBuiltContext(ctx)
         // Create it and check that it still does what we expect
-        val inst = cls.newInstance()
+        @Suppress("DEPRECATION") val inst = cls.newInstance()
         // Run someFunc
         cls.getMethod("someFunc").invoke(inst)
         // Get the memory out

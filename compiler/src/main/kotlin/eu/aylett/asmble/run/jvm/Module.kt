@@ -63,22 +63,26 @@ interface Module {
                     ) else it.toString()
                 }, 1)
             }
-        @SuppressWarnings("UNCHECKED_CAST")
         override fun <T> exportedMemory(field: String, memClass: Class<T>) =
             bindMethod(field, WasmExternalKind.MEMORY, "get" + field.javaIdent.replaceFirstChar {
                 if (it.isLowerCase()) it.titlecase(
                     Locale.getDefault()
                 ) else it.toString()
             }, 0)?.
-                takeIf { it.type().returnType() == memClass }?.let { it.invokeWithArguments() as? T }
-        @SuppressWarnings("UNCHECKED_CAST")
+                takeIf { it.type().returnType() == memClass }?.let {
+                @Suppress("UNCHECKED_CAST")
+                it.invokeWithArguments() as? T
+            }
         override fun exportedTable(field: String) =
             bindMethod(field, WasmExternalKind.TABLE, "get" + field.javaIdent.replaceFirstChar {
                 if (it.isLowerCase()) it.titlecase(
                     Locale.getDefault()
                 ) else it.toString()
             }, 0)?.
-                let { it.invokeWithArguments() as? Array<MethodHandle?> }
+                let {
+                    @Suppress("UNCHECKED_CAST")
+                    it.invokeWithArguments() as? Array<MethodHandle?>
+                }
     }
 
     data class Native(override val cls: Class<*>, override val name: String?, override val inst: Any) : Instance {
@@ -97,7 +101,7 @@ interface Module {
 
         private fun createInstance(imports: ImportResolver): Any {
             // Find the constructor
-            var constructorParams = emptyList<Any>()
+            val constructorParams = mutableListOf<Any>()
             var constructor: Constructor<*>?
 
             // If there is a memory import, we have to get the one with the mem class as the first
@@ -137,11 +141,11 @@ interface Module {
             if (constructor == null) error("Unable to find suitable module constructor")
 
             // Function imports
-            constructorParams += mod.imports.mapNotNull {
+            constructorParams.addAll(mod.imports.mapNotNull {
                 if (it.kind is Node.Import.Kind.Func)
                     imports.resolveImportFunc(it.module, it.field, mod.types[it.kind.typeIndex])
                 else null
-            }
+            })
 
             // Global imports
             val globalImports = mod.imports.flatMap {
@@ -149,7 +153,7 @@ interface Module {
                     imports.resolveImportGlobal(it.module, it.field, it.kind.type).toList().mapNotNull { it }
                 } else emptyList()
             }
-            constructorParams += globalImports
+            constructorParams.addAll(globalImports)
 
             // Table imports
             val tableImport = mod.imports.find { it.kind is Node.Import.Kind.Table }
@@ -161,7 +165,7 @@ interface Module {
                 tableImportKind.type.limits.maximum?.let {
                     if (table.size > it) throw RunErr.ImportTableTooLarge(it, table.size)
                 }
-                constructorParams = constructorParams.plusElement(table)
+                constructorParams += table
                 table.size
             } else mod.tables.firstOrNull()?.limits?.initial
 

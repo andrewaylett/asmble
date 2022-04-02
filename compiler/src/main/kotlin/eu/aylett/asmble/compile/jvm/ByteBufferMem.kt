@@ -52,15 +52,15 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
                 // due to JVM limits, we can't have a string > 65536 chars. We chunk into 16300 because when
                 // converting to UTF8 const it can be up to 4 bytes per char, so this makes sure it doesn't
                 // overflow.
-                bytes.chunked(16300).flatMap { bytes ->
+                bytes.chunked(16300).flatMap { b ->
                     sequenceOf(
-                        LdcInsnNode(bytes.toString(Charsets.ISO_8859_1)),
+                        LdcInsnNode(b.toString(Charsets.ISO_8859_1)),
                         LdcInsnNode("ISO-8859-1"),
                         // Ug, can't do func refs on native types here...
                         MethodInsnNode(Opcodes.INVOKEVIRTUAL, String::class.ref.asmName,
                             "getBytes", "(Ljava/lang/String;)[B", false),
                         0.const,
-                        bytes.size.const,
+                        b.size.const,
                         forceFnType<ByteBuffer.(ByteArray, Int, Int) -> ByteBuffer>(ByteBuffer::put).invokeVirtual()
                     )
                 }.toList()
@@ -74,15 +74,15 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
         InsnNode(Opcodes.IDIV)
     ).push(Int::class.ref)
 
-    override fun growMemory(ctx: FuncContext, func: Func) = getOrCreateGrowMemoryMethod(ctx, func).let { method ->
+    override fun growMemory(ctx: FuncContext, func: Func) = getOrCreateGrowMemoryMethod(ctx).let { method ->
         func.popExpecting(Int::class.ref).popExpecting(memType).addInsns(
             // This is complicated enough to need a synthetic method
             MethodInsnNode(Opcodes.INVOKESTATIC, ctx.cls.thisRef.asmName, method.name, method.desc, false)
         ).push(Int::class.ref)
     }
 
-    fun getOrCreateGrowMemoryMethod(ctx: FuncContext, func: Func): MethodNode =
-        ctx.cls.cls.methods.find { it?.name == "\$\$growMemory" }?.let { it } ?: run {
+    private fun getOrCreateGrowMemoryMethod(ctx: FuncContext): MethodNode =
+        ctx.cls.cls.methods.find { it?.name == "\$\$growMemory" } ?: run {
             val okLim = LabelNode()
             val node = MethodNode(
                 Opcodes.ACC_PRIVATE + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
@@ -124,18 +124,18 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
     override fun loadOp(ctx: FuncContext, func: Func, insn: Node.Instr.Args.AlignOffset): Func {
         // Ug, some tests expect this to be a runtime failure so we feature flagged it
         if (ctx.cls.eagerFailLargeMemOffset)
-            require(insn.offset <= Int.MAX_VALUE, { "Offsets > ${Int.MAX_VALUE} unsupported" }).let { this }
+            require(insn.offset <= Int.MAX_VALUE) { "Offsets > ${Int.MAX_VALUE} unsupported" }.let { this }
         fun Func.load(fn: ByteBuffer.(Int) -> Any, retClass: KClass<*>) =
             this.popExpecting(Int::class.ref).let { func ->
                 // No offset means we'll access it directly
                 (if (insn.offset == 0L) func else {
                     // Since some things want runtime failure, we'll give it them via -1
                     if (insn.offset > Int.MAX_VALUE) func.addInsns(InsnNode(Opcodes.POP), (-1).const) else {
-                        func.addInsns(insn.offset.toInt().const).let { func ->
+                        func.addInsns(insn.offset.toInt().const).let {
                             // Simple add if no bounds check
-                            if (!ctx.cls.preventMemIndexOverflow) func.addInsns(InsnNode(Opcodes.IADD)) else {
+                            if (!ctx.cls.preventMemIndexOverflow) it.addInsns(InsnNode(Opcodes.IADD)) else {
                                 // Otherwise, do an addExact
-                                func.addInsns(forceFnType<(Int, Int) -> Int>(Math::addExact).invokeStatic())
+                                it.addInsns(forceFnType<(Int, Int) -> Int>(Math::addExact).invokeStatic())
                             }
                         }
                     }
@@ -195,37 +195,35 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
     }
 
     override fun storeOp(ctx: FuncContext, func: Func, insn: Node.Instr.Args.AlignOffset) =
-        func.let { func ->
+        func.let {
             // Ug, some tests expect this to be a runtime failure so we feature flagged it
             if (ctx.cls.eagerFailLargeMemOffset)
-                require(insn.offset <= Int.MAX_VALUE, { "Offsets > ${Int.MAX_VALUE} unsupported" }).let { this }
+                require(insn.offset <= Int.MAX_VALUE) { "Offsets > ${Int.MAX_VALUE} unsupported" }.let { this }
             fun Func.store(fn: MethodInsnNode, inClass: KClass<*>) =
                 // Stack comes in as mem + index + value which is good...
                 // However, if the offset is not 0, we have to add to index which means
                 // a swap, add, swap back.
-                if (insn.offset == 0L) this else {
+                (if (insn.offset == 0L) this else {
                     // Swap, do things, swap back
                     this.stackSwap().let { func ->
                         // Since some things want runtime failure, we'll give it them via -1
                         if (insn.offset > Int.MAX_VALUE) func.addInsns(InsnNode(Opcodes.POP), (-1).const) else {
                             // Otherwise, just add to the offset
-                            func.addInsns(insn.offset.toInt().const).let { func ->
+                            func.addInsns(insn.offset.toInt().const).let {
                                 // Simple add if no bounds check
-                                if (!ctx.cls.preventMemIndexOverflow) func.addInsns(InsnNode(Opcodes.IADD)) else {
+                                if (!ctx.cls.preventMemIndexOverflow) it.addInsns(InsnNode(Opcodes.IADD)) else {
                                     // Otherwise, do an addExact which does bounds check
-                                    func.addInsns(forceFnType<(Int, Int) -> Int>(Math::addExact).invokeStatic())
+                                    it.addInsns(forceFnType<(Int, Int) -> Int>(Math::addExact).invokeStatic())
                                 }
                             }
                         }
                     }.stackSwap()
-                }.let { func ->
-                    // Now we can do the call since we know it's mem + index-with-offset + value
-                    func.popExpecting(inClass.ref).
-                        popExpecting(Int::class.ref).
-                        popExpecting(memType).
-                        addInsns(fn).
-                        push(ByteBuffer::class.ref)
-                }
+                }).popExpecting(inClass.ref).
+                    popExpecting(Int::class.ref).
+                    popExpecting(memType).
+                    addInsns(fn).
+                    push(ByteBuffer::class.ref)
+                    // ^ Now we can do the call since we know it's mem + index-with-offset + value
             // Ug, I hate these as strings but can't introspect Kotlin overloads
             fun bufStoreFunc(name: String, valType: KClass<*>) =
                 MethodInsnNode(Opcodes.INVOKEVIRTUAL, ByteBuffer::class.ref.asmName, name,
@@ -234,25 +232,25 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
                 this.popExpecting(Long::class.ref).push(Int::class.ref)
             when (insn) {
                 is Node.Instr.I32Store ->
-                    func.store(bufStoreFunc("putInt", Int::class), Int::class)
+                    it.store(bufStoreFunc("putInt", Int::class), Int::class)
                 is Node.Instr.I64Store ->
-                    func.store(bufStoreFunc("putLong", Long::class), Long::class)
+                    it.store(bufStoreFunc("putLong", Long::class), Long::class)
                 is Node.Instr.F32Store ->
-                    func.store(bufStoreFunc("putFloat", Float::class), Float::class)
+                    it.store(bufStoreFunc("putFloat", Float::class), Float::class)
                 is Node.Instr.F64Store ->
-                    func.store(bufStoreFunc("putDouble", Double::class), Double::class)
+                    it.store(bufStoreFunc("putDouble", Double::class), Double::class)
                 is Node.Instr.I32Store8 ->
-                    func.addInsns(InsnNode(Opcodes.I2B)).store(bufStoreFunc("put", Byte::class), Int::class)
+                    it.addInsns(InsnNode(Opcodes.I2B)).store(bufStoreFunc("put", Byte::class), Int::class)
                 is Node.Instr.I32Store16 ->
-                    func.addInsns(InsnNode(Opcodes.I2S)).store(bufStoreFunc("putShort", Short::class), Int::class)
+                    it.addInsns(InsnNode(Opcodes.I2S)).store(bufStoreFunc("putShort", Short::class), Int::class)
                 is Node.Instr.I64Store8 ->
-                    func.addInsns(InsnNode(Opcodes.L2I), InsnNode(Opcodes.I2B)).
+                    it.addInsns(InsnNode(Opcodes.L2I), InsnNode(Opcodes.I2B)).
                         changeI64ToI32().store(bufStoreFunc("put", Byte::class), Int::class)
                 is Node.Instr.I64Store16 ->
-                    func.addInsns(InsnNode(Opcodes.L2I), InsnNode(Opcodes.I2S)).
+                    it.addInsns(InsnNode(Opcodes.L2I), InsnNode(Opcodes.I2S)).
                         changeI64ToI32().store(bufStoreFunc("putShort", Short::class), Int::class)
                 is Node.Instr.I64Store32 ->
-                    func.addInsns(InsnNode(Opcodes.L2I)).
+                    it.addInsns(InsnNode(Opcodes.L2I)).
                         changeI64ToI32().store(bufStoreFunc("putInt", Int::class), Int::class)
                 else -> throw IllegalArgumentException("Unknown store op $insn")
             }
