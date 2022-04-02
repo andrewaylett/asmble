@@ -7,7 +7,7 @@ open class SExprToStr(val depthBeforeNewline: Int, val countBeforeNewlineAll: In
     fun fromSExpr(vararg exp: SExpr): String = appendAll(exp.asList(), StringBuilder()).trim().toString()
 
     @Suppress("UNCHECKED_CAST")
-    fun <T : Appendable> append(exp: SExpr, sb: T = StringBuilder() as T, indentLevel: Int = 0) = when(exp) {
+    fun <T : Appendable> append(exp: SExpr, sb: T = StringBuilder() as T, indentLevel: Int = 0) = when (exp) {
         is SExpr.Symbol -> appendSymbol(exp, sb)
         is SExpr.Multi -> appendMulti(exp, sb, indentLevel)
     }
@@ -64,17 +64,19 @@ open class SExprToStr(val depthBeforeNewline: Int, val countBeforeNewlineAll: In
         return sb
     }
 
-    val String.requiresQuote: Boolean get() =
-        this.find { it.requiresQuote } != null
-    val Char.requiresQuote: Boolean get() =
-        this > '~' || (!this.isLetterOrDigit() && this !in "_.+-*/^~=<>!?@#$%&|:'`")
+    val String.requiresQuote: Boolean
+        get() =
+            this.find { it.requiresQuote } != null
+    val Char.requiresQuote: Boolean
+        get() =
+            this > '~' || (!this.isLetterOrDigit() && this !in "_.+-*/^~=<>!?@#$%&|:'`")
 
-    fun SExpr.count(): Int = when(this) {
+    fun SExpr.count(): Int = when (this) {
         is SExpr.Symbol -> 1
         is SExpr.Multi -> this.vals.sumOf { it.count() }
     }
 
-    fun SExpr.maxDepth(): Int = when(this) {
+    fun SExpr.maxDepth(): Int = when (this) {
         is SExpr.Symbol -> 0
         is SExpr.Multi -> 1 + (this.vals.maxOfOrNull { it.maxDepth() } ?: 0)
     }

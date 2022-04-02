@@ -96,8 +96,8 @@ open class AstToBinary(val version: Long = 1L) {
         when (op) {
             is Node.InstrOp.ControlFlowOp.NoArg, is Node.InstrOp.ParamOp.NoArg,
             is Node.InstrOp.CompareOp.NoArg, is Node.InstrOp.NumOp.NoArg,
-            is Node.InstrOp.ConvertOp.NoArg, is Node.InstrOp.ReinterpretOp.NoArg ->
-                { }
+            is Node.InstrOp.ConvertOp.NoArg, is Node.InstrOp.ReinterpretOp.NoArg -> {
+            }
             is Node.InstrOp.ControlFlowOp.TypeArg ->
                 b.writeVarInt7(op.args().type.valueType)
             is Node.InstrOp.ControlFlowOp.DepthArg ->
@@ -172,8 +172,9 @@ open class AstToBinary(val version: Long = 1L) {
     fun fromNames(b: ByteWriter, n: Node.NameSection) {
         fun <T> indexMap(b: ByteWriter, map: Map<Int, T>, fn: (T) -> Unit) {
             b.writeVarUInt32(map.size)
-            map.forEach { index, v -> b.writeVarUInt32(index).also { fn(v) } }
+            map.forEach { (index, v) -> b.writeVarUInt32(index).also { fn(v) } }
         }
+
         fun nameMap(b: ByteWriter, map: Map<Int, String>) = indexMap(b, map) { b.writeString(it) }
         b.writeVarUInt7(0)
         b.withVarUInt32PayloadSizePrepended { b ->
@@ -243,31 +244,35 @@ open class AstToBinary(val version: Long = 1L) {
         this.writeBytes(bytes)
     }
 
-    val Node.ExternalKind.externalKind: Byte get() = when(this) {
-        Node.ExternalKind.FUNCTION -> 0
-        Node.ExternalKind.TABLE -> 1
-        Node.ExternalKind.MEMORY -> 2
-        Node.ExternalKind.GLOBAL -> 3
-    }
+    val Node.ExternalKind.externalKind: Byte
+        get() = when (this) {
+            Node.ExternalKind.FUNCTION -> 0
+            Node.ExternalKind.TABLE -> 1
+            Node.ExternalKind.MEMORY -> 2
+            Node.ExternalKind.GLOBAL -> 3
+        }
 
-    val Node.Import.Kind.externalKind: Byte get() = when(this) {
-        is Node.Import.Kind.Func -> 0
-        is Node.Import.Kind.Table -> 1
-        is Node.Import.Kind.Memory -> 2
-        is Node.Import.Kind.Global -> 3
-    }
+    val Node.Import.Kind.externalKind: Byte
+        get() = when (this) {
+            is Node.Import.Kind.Func -> 0
+            is Node.Import.Kind.Table -> 1
+            is Node.Import.Kind.Memory -> 2
+            is Node.Import.Kind.Global -> 3
+        }
 
-    val Node.Type.Value?.valueType: Byte get() = when(this) {
-        null -> -0x40
-        Node.Type.Value.I32 -> -0x01
-        Node.Type.Value.I64 -> -0x02
-        Node.Type.Value.F32 -> -0x03
-        Node.Type.Value.F64 -> -0x04
-    }
+    val Node.Type.Value?.valueType: Byte
+        get() = when (this) {
+            null -> -0x40
+            Node.Type.Value.I32 -> -0x01
+            Node.Type.Value.I64 -> -0x02
+            Node.Type.Value.F32 -> -0x03
+            Node.Type.Value.F64 -> -0x04
+        }
 
-    val Node.ElemType.elemType: Byte get() = when(this) {
-        Node.ElemType.ANYFUNC -> -0x10
-    }
+    val Node.ElemType.elemType: Byte
+        get() = when (this) {
+            Node.ElemType.ANYFUNC -> -0x10
+        }
 
     companion object : AstToBinary()
 }

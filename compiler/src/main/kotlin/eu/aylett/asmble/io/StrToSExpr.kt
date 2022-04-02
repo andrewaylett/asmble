@@ -2,7 +2,6 @@ package eu.aylett.asmble.io
 
 import eu.aylett.asmble.ast.SExpr
 import java.nio.ByteBuffer
-import java.nio.charset.CharacterCodingException
 
 open class StrToSExpr {
     sealed class ParseResult {
@@ -15,6 +14,7 @@ open class StrToSExpr {
             fun exprPos(fullStr: CharSequence, expr: SExpr) =
                 fullStr.posFromOffset(exprIdentOffsetMap.getValue(System.identityHashCode(expr)))
         }
+
         data class Error(val pos: Pos, val msg: String) : ParseResult()
     }
 
@@ -159,7 +159,7 @@ open class StrToSExpr {
                     val end = str.indexOf('\n', offset)
                     if (end == -1) offset = str.length else offset = end + 1
                 }
-            } while(!isEof && origOffset != offset)
+            } while (!isEof && origOffset != offset)
         }
 
         val isEof: Boolean inline get() = offset >= str.length

@@ -8,7 +8,15 @@ import eu.aylett.asmble.util.add
 import org.objectweb.asm.Handle
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
-import org.objectweb.asm.tree.*
+import org.objectweb.asm.tree.AbstractInsnNode
+import org.objectweb.asm.tree.FieldInsnNode
+import org.objectweb.asm.tree.InsnNode
+import org.objectweb.asm.tree.InvokeDynamicInsnNode
+import org.objectweb.asm.tree.JumpInsnNode
+import org.objectweb.asm.tree.LabelNode
+import org.objectweb.asm.tree.MethodInsnNode
+import org.objectweb.asm.tree.TableSwitchInsnNode
+import org.objectweb.asm.tree.VarInsnNode
 import java.lang.invoke.MethodHandle
 
 // TODO: modularize
@@ -34,7 +42,7 @@ open class FuncBuilder {
             node = f,
             insns = reworkedInsns,
             memIsLocalVar =
-                ctx.reworker.nonAdjacentMemAccesses(reworkedInsns) >= ctx.nonAdjacentMemAccessesRequiringLocalVar
+            ctx.reworker.nonAdjacentMemAccesses(reworkedInsns) >= ctx.nonAdjacentMemAccessesRequiringLocalVar
         )
 
         // Add the mem as a local variable if necessary
@@ -50,7 +58,7 @@ open class FuncBuilder {
         func = funcCtx.insns.foldIndexed(func) { i, ff, insn ->
             ctx.debug { "Applying insn $insn" }
             val ret = applyInsn(funcCtx, ff, insn, i)
-            ctx.trace { "Resulting stack: ${ret.stack}"}
+            ctx.trace { "Resulting stack: ${ret.stack}" }
             ret
         }
 
@@ -61,13 +69,17 @@ open class FuncBuilder {
 
         // If the last instruction does not terminate, add the expected return
         if (func.insns.isEmpty() || !func.insns.last().isTerminating) {
-            func = func.addInsns(InsnNode(when (f.type.ret) {
-                null -> Opcodes.RETURN
-                Node.Type.Value.I32 -> Opcodes.IRETURN
-                Node.Type.Value.I64 -> Opcodes.LRETURN
-                Node.Type.Value.F32 -> Opcodes.FRETURN
-                Node.Type.Value.F64 -> Opcodes.DRETURN
-            }))
+            func = func.addInsns(
+                InsnNode(
+                    when (f.type.ret) {
+                        null -> Opcodes.RETURN
+                        Node.Type.Value.I32 -> Opcodes.IRETURN
+                        Node.Type.Value.I64 -> Opcodes.LRETURN
+                        Node.Type.Value.F32 -> Opcodes.FRETURN
+                        Node.Type.Value.F64 -> Opcodes.DRETURN
+                    }
+                )
+            )
         }
         return func
     }
@@ -79,15 +91,19 @@ open class FuncBuilder {
             // Func refs are method handle fields
             fn.addInsns(
                 VarInsnNode(Opcodes.ALOAD, 0),
-                FieldInsnNode(Opcodes.GETFIELD, ctx.cls.thisRef.asmName,
-                    ctx.cls.funcName(i.index), MethodHandle::class.ref.asmDesc)
+                FieldInsnNode(
+                    Opcodes.GETFIELD, ctx.cls.thisRef.asmName,
+                    ctx.cls.funcName(i.index), MethodHandle::class.ref.asmDesc
+                )
             ).push(MethodHandle::class.ref)
         is Insn.ImportGlobalSetRefNeededOnStack ->
             // Import setters are method handle fields
             fn.addInsns(
                 VarInsnNode(Opcodes.ALOAD, 0),
-                FieldInsnNode(Opcodes.GETFIELD, ctx.cls.thisRef.asmName,
-                    ctx.cls.importGlobalSetterFieldName(i.index), MethodHandle::class.ref.asmDesc)
+                FieldInsnNode(
+                    Opcodes.GETFIELD, ctx.cls.thisRef.asmName,
+                    ctx.cls.importGlobalSetterFieldName(i.index), MethodHandle::class.ref.asmDesc
+                )
             ).push(MethodHandle::class.ref)
         is Insn.ThisNeededOnStack ->
             fn.addInsns(VarInsnNode(Opcodes.ALOAD, 0)).push(ctx.cls.thisRef)
@@ -106,8 +122,8 @@ open class FuncBuilder {
             fn.pushBlock(i, null, i.type)
         is Node.Instr.If ->
             // The label is set in else or end
-            fn.popExpecting(Int::class.ref).pushBlock(i, i.type, i.type).pushIf().
-                addInsns(JumpInsnNode(Opcodes.IFEQ, null))
+            fn.popExpecting(Int::class.ref).pushBlock(i, i.type, i.type).pushIf()
+                .addInsns(JumpInsnNode(Opcodes.IFEQ, null))
         is Node.Instr.Else ->
             applyElse(ctx, fn)
         is Node.Instr.End ->
@@ -250,7 +266,11 @@ open class FuncBuilder {
         is Node.Instr.I32RemS ->
             applyI32Binary(ctx, fn, Opcodes.IREM)
         is Node.Instr.I32RemU ->
-            applyI32Binary(ctx, fn, Integer::class.invokeStatic("remainderUnsigned", Int::class, Int::class, Int::class))
+            applyI32Binary(
+                ctx,
+                fn,
+                Integer::class.invokeStatic("remainderUnsigned", Int::class, Int::class, Int::class)
+            )
         is Node.Instr.I32And ->
             applyI32Binary(ctx, fn, Opcodes.IAND)
         is Node.Instr.I32Or ->
@@ -268,16 +288,19 @@ open class FuncBuilder {
         is Node.Instr.I32Rotr ->
             applyI32Binary(ctx, fn, Integer::class.invokeStatic("rotateRight", Int::class, Int::class, Int::class))
         is Node.Instr.I64Clz ->
-            applyI64Unary(ctx, fn,
-                java.lang.Long::class.invokeStatic("numberOfLeadingZeros", Int::class, Long::class)).
-                    addInsns(InsnNode(Opcodes.I2L))
+            applyI64Unary(
+                ctx, fn,
+                java.lang.Long::class.invokeStatic("numberOfLeadingZeros", Int::class, Long::class)
+            ).addInsns(InsnNode(Opcodes.I2L))
         is Node.Instr.I64Ctz ->
-            applyI64Unary(ctx, fn,
-                java.lang.Long::class.invokeStatic("numberOfTrailingZeros", Int::class, Long::class)).
-                    addInsns(InsnNode(Opcodes.I2L))
+            applyI64Unary(
+                ctx, fn,
+                java.lang.Long::class.invokeStatic("numberOfTrailingZeros", Int::class, Long::class)
+            ).addInsns(InsnNode(Opcodes.I2L))
         is Node.Instr.I64Popcnt ->
-            applyI64Unary(ctx, fn, java.lang.Long::class.invokeStatic("bitCount", Int::class, Long::class)).
-                addInsns(InsnNode(Opcodes.I2L))
+            applyI64Unary(ctx, fn, java.lang.Long::class.invokeStatic("bitCount", Int::class, Long::class)).addInsns(
+                InsnNode(Opcodes.I2L)
+            )
         is Node.Instr.I64Add ->
             applyI64Binary(ctx, fn, Opcodes.LADD)
         is Node.Instr.I64Sub ->
@@ -289,13 +312,23 @@ open class FuncBuilder {
                 applyI64Binary(ctx, it, Opcodes.LDIV)
             }
         is Node.Instr.I64DivU ->
-            applyI64Binary(ctx, fn, java.lang.Long::class.invokeStatic("divideUnsigned",
-                Long::class, Long::class, Long::class))
+            applyI64Binary(
+                ctx, fn,
+                java.lang.Long::class.invokeStatic(
+                    "divideUnsigned",
+                    Long::class, Long::class, Long::class
+                )
+            )
         is Node.Instr.I64RemS ->
             applyI64Binary(ctx, fn, Opcodes.LREM)
         is Node.Instr.I64RemU ->
-            applyI64Binary(ctx, fn, java.lang.Long::class.invokeStatic("remainderUnsigned",
-                Long::class, Long::class, Long::class))
+            applyI64Binary(
+                ctx, fn,
+                java.lang.Long::class.invokeStatic(
+                    "remainderUnsigned",
+                    Long::class, Long::class, Long::class
+                )
+            )
         is Node.Instr.I64And ->
             applyI64Binary(ctx, fn, Opcodes.LAND)
         is Node.Instr.I64Or ->
@@ -309,11 +342,21 @@ open class FuncBuilder {
         is Node.Instr.I64ShrU ->
             applyI64BinarySecondOpI32(ctx, fn, Opcodes.LUSHR)
         is Node.Instr.I64Rotl ->
-            applyI64BinarySecondOpI32(ctx, fn, java.lang.Long::class.invokeStatic("rotateLeft",
-                Long::class, Long::class, Int::class))
+            applyI64BinarySecondOpI32(
+                ctx, fn,
+                java.lang.Long::class.invokeStatic(
+                    "rotateLeft",
+                    Long::class, Long::class, Int::class
+                )
+            )
         is Node.Instr.I64Rotr ->
-            applyI64BinarySecondOpI32(ctx, fn, java.lang.Long::class.invokeStatic("rotateRight",
-                Long::class, Long::class, Int::class))
+            applyI64BinarySecondOpI32(
+                ctx, fn,
+                java.lang.Long::class.invokeStatic(
+                    "rotateRight",
+                    Long::class, Long::class, Int::class
+                )
+            )
         is Node.Instr.F32Abs ->
             applyF32UnaryNanReturnPositive(ctx, fn) {
                 applyF32Unary(ctx, it, forceFnType<(Float) -> Float>(Math::abs).invokeStatic())
@@ -403,8 +446,10 @@ open class FuncBuilder {
         is Node.Instr.I64ExtendSI32 ->
             applyConv(ctx, fn, Int::class.ref, Long::class.ref, Opcodes.I2L)
         is Node.Instr.I64ExtendUI32 ->
-            applyConv(ctx, fn, Int::class.ref, Long::class.ref,
-                Integer::class.invokeStatic("toUnsignedLong", Long::class, Int::class))
+            applyConv(
+                ctx, fn, Int::class.ref, Long::class.ref,
+                Integer::class.invokeStatic("toUnsignedLong", Long::class, Int::class)
+            )
         is Node.Instr.I64TruncSF32 ->
             assertTruncConv(ctx, fn, Float::class.ref, Long::class.ref, signed = true).let {
                 applyConv(ctx, it, Float::class.ref, Long::class.ref, Opcodes.F2L)
@@ -424,8 +469,8 @@ open class FuncBuilder {
         is Node.Instr.F32ConvertSI32 ->
             applyConv(ctx, fn, Int::class.ref, Float::class.ref, Opcodes.I2F)
         is Node.Instr.F32ConvertUI32 ->
-            fn.addInsns(Integer::class.invokeStatic("toUnsignedLong", Long::class, Int::class)).
-                let { applyConv(ctx, it, Int::class.ref, Float::class.ref, Opcodes.L2F) }
+            fn.addInsns(Integer::class.invokeStatic("toUnsignedLong", Long::class, Int::class))
+                .let { applyConv(ctx, it, Int::class.ref, Float::class.ref, Opcodes.L2F) }
         is Node.Instr.F32ConvertSI64 ->
             applyConv(ctx, fn, Long::class.ref, Float::class.ref, Opcodes.L2F)
         is Node.Instr.F32ConvertUI64 ->
@@ -435,8 +480,8 @@ open class FuncBuilder {
         is Node.Instr.F64ConvertSI32 ->
             applyConv(ctx, fn, Int::class.ref, Double::class.ref, Opcodes.I2D)
         is Node.Instr.F64ConvertUI32 ->
-            fn.addInsns(Integer::class.invokeStatic("toUnsignedLong", Long::class, Int::class)).
-                let { applyConv(ctx, it, Int::class.ref, Double::class.ref, Opcodes.L2D) }
+            fn.addInsns(Integer::class.invokeStatic("toUnsignedLong", Long::class, Int::class))
+                .let { applyConv(ctx, it, Int::class.ref, Double::class.ref, Opcodes.L2D) }
         is Node.Instr.F64ConvertSI64 ->
             applyConv(ctx, fn, Long::class.ref, Double::class.ref, Opcodes.L2D)
         is Node.Instr.F64ConvertUI64 ->
@@ -444,17 +489,25 @@ open class FuncBuilder {
         is Node.Instr.F64PromoteF32 ->
             applyConv(ctx, fn, Float::class.ref, Double::class.ref, Opcodes.F2D)
         is Node.Instr.I32ReinterpretF32 ->
-            applyConv(ctx, fn, Float::class.ref, Int::class.ref,
-                java.lang.Float::class.invokeStatic("floatToRawIntBits", Int::class, Float::class))
+            applyConv(
+                ctx, fn, Float::class.ref, Int::class.ref,
+                java.lang.Float::class.invokeStatic("floatToRawIntBits", Int::class, Float::class)
+            )
         is Node.Instr.I64ReinterpretF64 ->
-            applyConv(ctx, fn, Double::class.ref, Long::class.ref,
-                java.lang.Double::class.invokeStatic("doubleToRawLongBits", Long::class, Double::class))
+            applyConv(
+                ctx, fn, Double::class.ref, Long::class.ref,
+                java.lang.Double::class.invokeStatic("doubleToRawLongBits", Long::class, Double::class)
+            )
         is Node.Instr.F32ReinterpretI32 ->
-            applyConv(ctx, fn, Int::class.ref, Float::class.ref,
-                java.lang.Float::class.invokeStatic("intBitsToFloat", Float::class, Int::class))
+            applyConv(
+                ctx, fn, Int::class.ref, Float::class.ref,
+                java.lang.Float::class.invokeStatic("intBitsToFloat", Float::class, Int::class)
+            )
         is Node.Instr.F64ReinterpretI64 ->
-            applyConv(ctx, fn, Long::class.ref, Double::class.ref,
-                java.lang.Double::class.invokeStatic("longBitsToDouble", Double::class, Long::class))
+            applyConv(
+                ctx, fn, Long::class.ref, Double::class.ref,
+                java.lang.Double::class.invokeStatic("longBitsToDouble", Double::class, Long::class)
+            )
     }
 
     private fun popForBlockEscape(ctx: FuncContext, fn: Func, block: Func.Block) =
@@ -483,10 +536,8 @@ open class FuncBuilder {
     private fun applyBr(ctx: FuncContext, fn: Func, i: Node.Instr.Br) =
         fn.blockAtDepth(i.relativeDepth).let { block ->
             ctx.debug { "Unconditional branch on ${block.insn}, curr stack ${fn.stack}, orig stack ${block.origStack}" }
-            popForBlockEscape(ctx, fn, block).
-                popExpectingMulti(block.labelTypes, block).
-                addInsns(JumpInsnNode(Opcodes.GOTO, block.requiredLabel)).
-                markUnreachable()
+            popForBlockEscape(ctx, fn, block).popExpectingMulti(block.labelTypes, block)
+                .addInsns(JumpInsnNode(Opcodes.GOTO, block.requiredLabel)).markUnreachable()
         }
 
     private fun applyBrIf(ctx: FuncContext, fn: Func, i: Node.Instr.BrIf) =
@@ -528,6 +579,7 @@ open class FuncBuilder {
                     else LabelNode().also {
                         tempLabels += it to block
                     }
+
                 val defaultLabel = blockLabel(defaultBlock)
                 val targetLabels = targetBlocks.map(::blockLabel)
 
@@ -543,12 +595,10 @@ open class FuncBuilder {
                     val targetLabelsArr =
                         if (targetLabels.isNotEmpty()) targetLabels.toTypedArray()
                         else arrayOf(defaultLabel)
-                    f.addInsns(TableSwitchInsnNode(0, targetLabelsArr.size - 1, defaultLabel, *targetLabelsArr)).
-                        let { fn ->
+                    f.addInsns(TableSwitchInsnNode(0, targetLabelsArr.size - 1, defaultLabel, *targetLabelsArr))
+                        .let { fn ->
                             tempLabels.fold(fn) { ff, (label, block) -> buildPopBeforeJump(ctx, ff, block, label) }
-                        }.
-                        popExpectingMulti(defaultBlock.labelTypes).
-                        markUnreachable()
+                        }.popExpectingMulti(defaultBlock.labelTypes).markUnreachable()
                 }
             }
         }
@@ -577,8 +627,10 @@ open class FuncBuilder {
         val unreachableLabel = LabelNode()
         return fn.addInsns(
             ctx.cls.largeTableJumpCall(insn),
-            TableSwitchInsnNode(0, depthToLabel.size - 1, unreachableLabel,
-                *depthToLabel.map { it ?: unreachableLabel }.toTypedArray()),
+            TableSwitchInsnNode(
+                0, depthToLabel.size - 1, unreachableLabel,
+                *depthToLabel.map { it ?: unreachableLabel }.toTypedArray()
+            ),
             unreachableLabel
         ).addInsns(UnsupportedOperationException::class.athrow("Unreachable")).markUnreachable()
     }
@@ -611,11 +663,11 @@ open class FuncBuilder {
         return fn.addInsns(JumpInsnNode(Opcodes.GOTO, resumeLabel), tempLabel).withoutAffectingStack {
             (requiredStackCount until it.stack.size).fold(it) { fn, _ ->
                 if (fn.stack.size == 1) {
-                    fn.addInsns(InsnNode(if (fn.stack.last().stackSize == 2) Opcodes.POP2 else Opcodes.POP)).
-                    pop(block).first
+                    fn.addInsns(InsnNode(if (fn.stack.last().stackSize == 2) Opcodes.POP2 else Opcodes.POP))
+                        .pop(block).first
                 } else fn.stackSwap(block).let {
-                    it.addInsns(InsnNode(if (it.stack.last().stackSize == 2) Opcodes.POP2 else Opcodes.POP)).
-                    pop(block).first
+                    it.addInsns(InsnNode(if (it.stack.last().stackSize == 2) Opcodes.POP2 else Opcodes.POP))
+                        .pop(block).first
                 }
             }
         }.addInsns(
@@ -820,7 +872,6 @@ open class FuncBuilder {
     private fun applyConv(ctx: FuncContext, fn: Func, from: TypeRef, to: TypeRef, insn: AbstractInsnNode) =
         fn.popExpecting(from).addInsns(insn).push(to)
 
-
     private fun applyF64Trunc(ctx: FuncContext, fn: Func): Func {
         // The best way for now is a comparison and jump to ceil or floor sadly
         // So with it on the stack:
@@ -935,12 +986,8 @@ open class FuncBuilder {
     }
 
     private fun applyWithF32To64AndBack(ctx: FuncContext, fn: Func, f: (Func) -> Func) =
-        fn.popExpecting(Float::class.ref).
-            addInsns(InsnNode(Opcodes.F2D)).
-            push(Double::class.ref).let(f).
-            popExpecting(Double::class.ref).
-            addInsns(InsnNode(Opcodes.D2F)).
-            push(Float::class.ref)
+        fn.popExpecting(Float::class.ref).addInsns(InsnNode(Opcodes.F2D)).push(Double::class.ref).let(f)
+            .popExpecting(Double::class.ref).addInsns(InsnNode(Opcodes.D2F)).push(Float::class.ref)
 
     private fun applyF64Binary(ctx: FuncContext, fn: Func, op: Int) =
         applyF64Binary(ctx, fn, InsnNode(op))
@@ -958,8 +1005,8 @@ open class FuncBuilder {
         applyI64BinarySecondOpI32(ctx, fn, InsnNode(op))
 
     private fun applyI64BinarySecondOpI32(ctx: FuncContext, fn: Func, insn: AbstractInsnNode) =
-        fn.popExpectingMulti(Long::class.ref, Long::class.ref).
-            addInsns(InsnNode(Opcodes.L2I), insn).push(Long::class.ref)
+        fn.popExpectingMulti(Long::class.ref, Long::class.ref).addInsns(InsnNode(Opcodes.L2I), insn)
+            .push(Long::class.ref)
 
     private fun applyI64Binary(ctx: FuncContext, fn: Func, op: Int) =
         applyI64Binary(ctx, fn, InsnNode(op))
@@ -993,41 +1040,35 @@ open class FuncBuilder {
 
     private fun applyF32Cmp(ctx: FuncContext, fn: Func, op: Int, nanIsOne: Boolean = true) =
         // TODO: Can we shorten this and use the direct cmp result instead of IF<OP>?
-        fn.popExpecting(Float::class.ref).
-            popExpecting(Float::class.ref).
-            addInsns(InsnNode(if (nanIsOne) Opcodes.FCMPG else Opcodes.FCMPL)).
-            push(Int::class.ref).
-            let { applyI32UnaryCmp(ctx, it, op) }
+        fn.popExpecting(Float::class.ref).popExpecting(Float::class.ref)
+            .addInsns(InsnNode(if (nanIsOne) Opcodes.FCMPG else Opcodes.FCMPL)).push(Int::class.ref)
+            .let { applyI32UnaryCmp(ctx, it, op) }
 
     private fun applyF64Cmp(ctx: FuncContext, fn: Func, op: Int, nanIsOne: Boolean = true) =
-        fn.popExpecting(Double::class.ref).
-            popExpecting(Double::class.ref).
-            addInsns(InsnNode(if (nanIsOne) Opcodes.DCMPG else Opcodes.DCMPL)).
-            push(Int::class.ref).
-            let { applyI32UnaryCmp(ctx, it, op) }
+        fn.popExpecting(Double::class.ref).popExpecting(Double::class.ref)
+            .addInsns(InsnNode(if (nanIsOne) Opcodes.DCMPG else Opcodes.DCMPL)).push(Int::class.ref)
+            .let { applyI32UnaryCmp(ctx, it, op) }
 
     private fun applyI64CmpU(ctx: FuncContext, fn: Func, op: Int) =
-        applyCmpU(ctx, fn, op, Long::class.ref,
-            java.lang.Long::class.invokeStatic("compareUnsigned", Int::class, Long::class, Long::class))
+        applyCmpU(
+            ctx, fn, op, Long::class.ref,
+            java.lang.Long::class.invokeStatic("compareUnsigned", Int::class, Long::class, Long::class)
+        )
 
     private fun applyI32CmpU(ctx: FuncContext, fn: Func, op: Int) =
-        applyCmpU(ctx, fn, op, Int::class.ref,
-            Integer::class.invokeStatic("compareUnsigned", Int::class, Int::class, Int::class))
+        applyCmpU(
+            ctx, fn, op, Int::class.ref,
+            Integer::class.invokeStatic("compareUnsigned", Int::class, Int::class, Int::class)
+        )
 
     private fun applyCmpU(ctx: FuncContext, fn: Func, op: Int, inTypes: TypeRef, meth: MethodInsnNode) =
         // Call the method, then compare with 0
-        fn.popExpecting(inTypes).
-            popExpecting(inTypes).
-            addInsns(meth).
-            push(Int::class.ref).
-            let { applyI32UnaryCmp(ctx, it, op) }
+        fn.popExpecting(inTypes).popExpecting(inTypes).addInsns(meth).push(Int::class.ref)
+            .let { applyI32UnaryCmp(ctx, it, op) }
 
     private fun applyI64CmpS(ctx: FuncContext, fn: Func, op: Int) =
-        fn.popExpecting(Long::class.ref).
-            popExpecting(Long::class.ref).
-            addInsns(InsnNode(Opcodes.LCMP)).
-            push(Int::class.ref).
-            let { applyI32UnaryCmp(ctx, it, op) }
+        fn.popExpecting(Long::class.ref).popExpecting(Long::class.ref).addInsns(InsnNode(Opcodes.LCMP))
+            .push(Int::class.ref).let { applyI32UnaryCmp(ctx, it, op) }
 
     private fun applyI32CmpS(ctx: FuncContext, fn: Func, op: Int) = applyCmpS(ctx, fn, op, Int::class.ref)
 
@@ -1106,9 +1147,8 @@ open class FuncBuilder {
         // Only put it if it's not already leftover
         if (fn.lastStackIsMemLeftover) fn.copy(lastStackIsMemLeftover = false)
         else if (ctx.memIsLocalVar)
-            // Assume it's just past the locals
-            fn.addInsns(VarInsnNode(Opcodes.ALOAD, ctx.actualLocalIndex(ctx.node.localsSize))).
-                push(ctx.cls.mem.memType)
+        // Assume it's just past the locals
+            fn.addInsns(VarInsnNode(Opcodes.ALOAD, ctx.actualLocalIndex(ctx.node.localsSize))).push(ctx.cls.mem.memType)
         else fn.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
             FieldInsnNode(Opcodes.GETFIELD, ctx.cls.thisRef.asmName, "memory", ctx.cls.mem.memType.asmDesc)
@@ -1125,24 +1165,24 @@ open class FuncBuilder {
         if (!global.type.mutable) throw CompileErr.SetImmutableGlobal(index)
         // Just call putfield
         // Note, this is special and "this" has already been injected on the stack for us
-        return fn.popExpecting(global.type.contentType.typeRef).
-            popExpecting(ctx.cls.thisRef).
-            addInsns(
-                FieldInsnNode(Opcodes.PUTFIELD, ctx.cls.thisRef.asmName, ctx.cls.globalName(index),
-                    global.type.contentType.typeRef.asmDesc)
+        return fn.popExpecting(global.type.contentType.typeRef).popExpecting(ctx.cls.thisRef).addInsns(
+            FieldInsnNode(
+                Opcodes.PUTFIELD, ctx.cls.thisRef.asmName, ctx.cls.globalName(index),
+                global.type.contentType.typeRef.asmDesc
             )
+        )
     }
 
     private fun applyImportSetGlobal(ctx: FuncContext, fn: Func, index: Int, import: Node.Import.Kind.Global): Func {
         if (!import.type.mutable) throw CompileErr.SetImmutableGlobal(index)
         // Load the setter method handle field, then invoke it with stack val
         // Note, this is special and the method handle has already been injected on the stack for us
-        return fn.popExpecting(import.type.contentType.typeRef).
-            popExpecting(MethodHandle::class.ref).
-            addInsns(
-                MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
-                    "(${import.type.contentType.typeRef.asmDesc})V", false)
+        return fn.popExpecting(import.type.contentType.typeRef).popExpecting(MethodHandle::class.ref).addInsns(
+            MethodInsnNode(
+                Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
+                "(${import.type.contentType.typeRef.asmDesc})V", false
             )
+        )
     }
 
     private fun applyGetGlobal(ctx: FuncContext, fn: Func, index: Int) = ctx.cls.globalAtIndex(index).let {
@@ -1155,25 +1195,31 @@ open class FuncBuilder {
     private fun applySelfGetGlobal(ctx: FuncContext, fn: Func, index: Int, global: Node.Global) =
         fn.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
-            FieldInsnNode(Opcodes.GETFIELD, ctx.cls.thisRef.asmName, ctx.cls.globalName(index),
-                global.type.contentType.typeRef.asmDesc)
+            FieldInsnNode(
+                Opcodes.GETFIELD, ctx.cls.thisRef.asmName, ctx.cls.globalName(index),
+                global.type.contentType.typeRef.asmDesc
+            )
         ).push(global.type.contentType.typeRef)
 
     private fun applyImportGetGlobal(ctx: FuncContext, fn: Func, index: Int, import: Node.Import.Kind.Global) =
         // Load the getter method handle field, then invoke it with nothing
         fn.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
-            FieldInsnNode(Opcodes.GETFIELD, ctx.cls.thisRef.asmName,
-                ctx.cls.importGlobalGetterFieldName(index), MethodHandle::class.ref.asmDesc),
-            MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
-                "()" + import.type.contentType.typeRef.asmDesc, false)
+            FieldInsnNode(
+                Opcodes.GETFIELD, ctx.cls.thisRef.asmName,
+                ctx.cls.importGlobalGetterFieldName(index), MethodHandle::class.ref.asmDesc
+            ),
+            MethodInsnNode(
+                Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
+                "()" + import.type.contentType.typeRef.asmDesc, false
+            )
         ).push(import.type.contentType.typeRef)
 
-    private fun applyTeeLocal(ctx: FuncContext, fn: Func, index: Int) = ctx.node.localByIndex(index).typeRef.let { typeRef ->
-        fn.popExpecting(typeRef).
-            addInsns(InsnNode(if (typeRef.stackSize == 2) Opcodes.DUP2 else Opcodes.DUP)).
-            push(typeRef).push(typeRef).let { fn -> applySetLocal(ctx, fn, index) }
-    }
+    private fun applyTeeLocal(ctx: FuncContext, fn: Func, index: Int) =
+        ctx.node.localByIndex(index).typeRef.let { typeRef ->
+            fn.popExpecting(typeRef).addInsns(InsnNode(if (typeRef.stackSize == 2) Opcodes.DUP2 else Opcodes.DUP))
+                .push(typeRef).push(typeRef).let { fn -> applySetLocal(ctx, fn, index) }
+        }
 
     private fun applySetLocal(ctx: FuncContext, fn: Func, index: Int) =
         fn.popExpecting(ctx.node.localByIndex(index).typeRef).let {
@@ -1202,13 +1248,13 @@ open class FuncBuilder {
         // TODO: How much does this hurt performance vs using a two label solution? Surely dependent upon how
         // often we take the zero path.
         val nonZero = LabelNode()
-        return fn.popExpecting(Int::class.ref).
+        return fn.popExpecting(Int::class.ref)
             // Conditional jump
-            addInsns(JumpInsnNode(Opcodes.IFNE, nonZero)).
+            .addInsns(JumpInsnNode(Opcodes.IFNE, nonZero))
             // Swap
-            stackSwap().
+            .stackSwap()
             // Pop next two and confirm they are the same type
-            pop().let { (fn, type1) ->
+            .pop().let { (fn, type1) ->
                 fn.pop().let { (fn, type2) ->
                     if (!type1.equivalentTo(type2)) throw CompileErr.SelectMismatch(type1, type2)
                     // Label and pop
@@ -1227,12 +1273,16 @@ open class FuncBuilder {
             fn.popExpectingMulti(funcType.params.map(Node.Type.Value::typeRef)).let { fn ->
                 when (ctx.cls.funcAtIndex(index)) {
                     is Either.Left -> fn.popExpecting(MethodHandle::class.ref).addInsns(
-                        MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName,
-                            "invokeExact", funcType.asmDesc, false)
+                        MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName,
+                            "invokeExact", funcType.asmDesc, false
+                        )
                     )
                     is Either.Right -> fn.popExpecting(ctx.cls.thisRef).addInsns(
-                        MethodInsnNode(Opcodes.INVOKEVIRTUAL, ctx.cls.thisRef.asmName,
-                            ctx.cls.funcName(index), funcType.asmDesc, false)
+                        MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL, ctx.cls.thisRef.asmName,
+                            ctx.cls.funcName(index), funcType.asmDesc, false
+                        )
                     )
                 }.let { ff -> funcType.ret?.let { ff.push(it.typeRef) } ?: ff }
             }
@@ -1256,14 +1306,15 @@ open class FuncBuilder {
                 // The int index
                 Type.INT_TYPE
             )
-            fn.popExpecting(Int::class.ref).popExpecting(ctx.cls.thisRef).
-                popExpectingMulti(funcType.params.map(Node.Type.Value::typeRef)).
-                addInsns(
+            fn.popExpecting(Int::class.ref).popExpecting(ctx.cls.thisRef)
+                .popExpectingMulti(funcType.params.map(Node.Type.Value::typeRef)).addInsns(
                     InvokeDynamicInsnNode(
                         "indirectBootstrap",
                         desc,
-                        Handle(Opcodes.H_INVOKESTATIC, indirectBootstrapNode.owner,
-                            indirectBootstrapNode.name, indirectBootstrapNode.desc, false)
+                        Handle(
+                            Opcodes.H_INVOKESTATIC, indirectBootstrapNode.owner,
+                            indirectBootstrapNode.name, indirectBootstrapNode.desc, false
+                        )
                     )
                 ).let { fn -> funcType.ret?.let { fn.push(it.typeRef) } ?: fn }
         }

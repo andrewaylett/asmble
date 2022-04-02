@@ -8,7 +8,8 @@ import org.objectweb.asm.Type
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MethodNode
-import java.util.*
+import java.util.Locale
+import java.util.UUID
 
 data class ClsContext(
     val packageName: String,
@@ -48,11 +49,13 @@ data class ClsContext(
                 export.kind == Node.ExternalKind.GLOBAL ->
                     export.field.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
                         .let { listOf("get$it", "set$it") }
-                else -> listOf("get" + export.field.javaIdent.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(
-                        Locale.getDefault()
-                    ) else it.toString()
-                })
+                else -> listOf(
+                    "get" + export.field.javaIdent.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(
+                            Locale.getDefault()
+                        ) else it.toString()
+                    }
+                )
             }
         }.toMutableSet()
         mod.names?.funcNames?.toList()?.sortedBy { it.first }?.map { (index, origName) ->
@@ -63,7 +66,9 @@ data class ClsContext(
         }?.toMap()
     }
 
-    fun assertHasMemory() { if (!hasMemory) throw CompileErr.UnknownMemory(0) }
+    fun assertHasMemory() {
+        if (!hasMemory) throw CompileErr.UnknownMemory(0)
+    }
 
     fun typeAtIndex(index: Int) = mod.types.getOrNull(index) ?: throw CompileErr.UnknownType(index)
 
@@ -84,8 +89,9 @@ data class ClsContext(
     fun globalAtIndex(index: Int) = importGlobals.getOrNull(index).let {
         when (it) {
             null ->
-                Either.Right(mod.globals.getOrNull(index - importGlobals.size) ?:
-                    throw CompileErr.UnknownGlobal(index))
+                Either.Right(
+                    mod.globals.getOrNull(index - importGlobals.size) ?: throw CompileErr.UnknownGlobal(index)
+                )
             else ->
                 Either.Left(it)
         }
@@ -102,8 +108,11 @@ data class ClsContext(
     ): MethodInsnNode {
         val name = "\$\$$nameSuffix"
         val method =
-            cls.methods.find { (it as MethodNode).name == name }?.let { it } ?:
-                fn(syntheticFuncBuilder, this, name).also { cls.methods.add(it) }
+            cls.methods.find { (it as MethodNode).name == name }?.let { it } ?: fn(
+                syntheticFuncBuilder,
+                this,
+                name
+            ).also { cls.methods.add(it) }
         return MethodInsnNode(Opcodes.INVOKESTATIC, thisRef.asmName, method.name, method.desc, false)
     }
 

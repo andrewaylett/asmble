@@ -7,16 +7,25 @@ import eu.aylett.asmble.annotation.WasmModule
 import org.objectweb.asm.Handle
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
-import org.objectweb.asm.tree.*
+import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.FieldInsnNode
+import org.objectweb.asm.tree.FieldNode
+import org.objectweb.asm.tree.InsnNode
+import org.objectweb.asm.tree.JumpInsnNode
+import org.objectweb.asm.tree.LabelNode
+import org.objectweb.asm.tree.LdcInsnNode
+import org.objectweb.asm.tree.MethodInsnNode
+import org.objectweb.asm.tree.TypeInsnNode
+import org.objectweb.asm.tree.VarInsnNode
 import java.lang.invoke.MethodHandle
-import java.util.*
+import java.util.Locale
 
 open class Linker {
 
     fun link(ctx: Context) {
         // Quick check to prevent duplicate names
         ctx.classes.groupBy { it.name }.values.forEach {
-            require(it.size == 1) { "Duplicate module name: ${it.first().name}"}
+            require(it.size == 1) { "Duplicate module name: ${it.first().name}" }
         }
 
         // Common items
@@ -59,14 +68,16 @@ open class Linker {
                 "Page size ${ctx.defaultMaxMemPages} over max allowed $maxAllowed"
             }
         }
-        ctx.cls.fields.plusAssign(FieldNode(
-            // Make it volatile since it will be publicly mutable
-            Opcodes.ACC_PUBLIC + Opcodes.ACC_VOLATILE,
-            "defaultMaxMem",
-            "I",
-            null,
-            ctx.defaultMaxMemPages * Mem.PAGE_SIZE
-        ))
+        ctx.cls.fields.plusAssign(
+            FieldNode(
+                // Make it volatile since it will be publicly mutable
+                Opcodes.ACC_PUBLIC + Opcodes.ACC_VOLATILE,
+                "defaultMaxMem",
+                "I",
+                null,
+                ctx.defaultMaxMemPages * Mem.PAGE_SIZE
+            )
+        )
     }
 
     fun addCreationMethod(ctx: Context, mod: ModuleClass) {
@@ -162,12 +173,15 @@ open class Linker {
     fun addInstanceField(ctx: Context, mod: ModuleClass) {
         // Simple protected field  that is lazily populated (but doesn't need to be volatile)
         ctx.cls.fields.plusAssign(
-            FieldNode(Opcodes.ACC_PROTECTED, "instance" + mod.name.javaIdent.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(
-                    Locale.getDefault()
-                ) else it.toString()
-            },
-                mod.ref.asmDesc, null, null)
+            FieldNode(
+                Opcodes.ACC_PROTECTED,
+                "instance" + mod.name.javaIdent.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(
+                        Locale.getDefault()
+                    ) else it.toString()
+                },
+                mod.ref.asmDesc, null, null
+            )
         )
     }
 
@@ -185,33 +199,47 @@ open class Linker {
         val alreadyThereLabel = LabelNode()
         func = func.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
-            FieldInsnNode(Opcodes.GETFIELD, ctx.cls.name,
-                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }, mod.ref.asmDesc),
+            FieldInsnNode(
+                Opcodes.GETFIELD,
+                ctx.cls.name,
+                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                mod.ref.asmDesc
+            ),
             JumpInsnNode(Opcodes.IFNONNULL, alreadyThereLabel),
             VarInsnNode(Opcodes.ALOAD, 0)
         )
         func = params.fold(func) { func, importMod ->
             func.addInsns(
                 VarInsnNode(Opcodes.ALOAD, 0),
-                MethodInsnNode(Opcodes.INVOKEVIRTUAL, importMod.ref.asmName,
-                    importMod.name.javaIdent, importMod.ref.asMethodRetDesc(), false)
+                MethodInsnNode(
+                    Opcodes.INVOKEVIRTUAL, importMod.ref.asmName,
+                    importMod.name.javaIdent, importMod.ref.asMethodRetDesc(), false
+                )
             )
         }
         func = func.addInsns(
-            FieldInsnNode(Opcodes.PUTFIELD, ctx.cls.name,
-                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }, mod.ref.asmDesc),
+            FieldInsnNode(
+                Opcodes.PUTFIELD,
+                ctx.cls.name,
+                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                mod.ref.asmDesc
+            ),
             alreadyThereLabel,
             VarInsnNode(Opcodes.ALOAD, 0),
-            FieldInsnNode(Opcodes.GETFIELD, ctx.cls.name,
-                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }, mod.ref.asmDesc),
+            FieldInsnNode(
+                Opcodes.GETFIELD,
+                ctx.cls.name,
+                "instance" + mod.name.javaIdent.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                mod.ref.asmDesc
+            ),
             InsnNode(Opcodes.ARETURN)
         )
         ctx.cls.methods.plusAssign(func.toMethodNode())
     }
 
     class ModuleClass(val cls: Class<*>, overrideName: String? = null) {
-        val name: String = overrideName ?:
-            cls.getDeclaredAnnotation(WasmModule::class.java)?.name ?: error("No module name available for class $cls")
+        val name: String = overrideName ?: cls.getDeclaredAnnotation(WasmModule::class.java)?.name
+            ?: error("No module name available for class $cls")
         val ref = TypeRef(Type.getType(cls))
 
         fun importClasses(ctx: Context): List<ModuleClass> {

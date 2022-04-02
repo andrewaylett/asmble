@@ -19,7 +19,11 @@ abstract class TestRunner<out T : BaseTestUnit>(val unit: T) : TestBase() {
     @Test
     fun test() {
         unit.skipRunReason?.let { Assume.assumeTrue("Skipping ${unit.name}, reason: $it", false) }
-        val ex = try { run(); null } catch (e: Throwable) { e }
+        val ex = try {
+            run(); null
+        } catch (e: Throwable) {
+            e
+        }
         if (unit.shouldFail) {
             assertNotNull(ex, "Expected failure, but succeeded")
             debug { "Got expected failure: $ex" }
@@ -61,7 +65,7 @@ abstract class TestRunner<out T : BaseTestUnit>(val unit: T) : TestBase() {
     }
 
     // TODO: move this into the script context for specific assertions so the rest can continue running
-    open fun warningInsteadOfErrReason(t: Throwable): String? =  when (unit.name) {
+    open fun warningInsteadOfErrReason(t: Throwable): String? = when (unit.name) {
         // NaN bit patterns can be off
         "float_literals", "float_exprs", "float_misc", "f32_bitwise" ->
             if (isNanMismatch(t)) "NaN JVM bit patterns can be off" else null
@@ -84,10 +88,12 @@ abstract class TestRunner<out T : BaseTestUnit>(val unit: T) : TestBase() {
 
     private fun isNanMismatch(t: Throwable) = t is ScriptAssertionError && (
         t.assertion is Script.Cmd.Assertion.ReturnNan ||
-            (t.assertion is Script.Cmd.Assertion.Return && (t.assertion as Script.Cmd.Assertion.Return).let {
-                it.exprs.any { it.any(this::insnIsNanConst) } ||
-                    ((it.action as? Script.Cmd.Action.Invoke)?.string?.contains("nan") ?: false)
-            })
+            (
+                t.assertion is Script.Cmd.Assertion.Return && (t.assertion as Script.Cmd.Assertion.Return).let {
+                    it.exprs.any { it.any(this::insnIsNanConst) } ||
+                        ((it.action as? Script.Cmd.Action.Invoke)?.string?.contains("nan") ?: false)
+                }
+                )
         )
 
     private fun insnIsNanConst(i: Node.Instr) = when (i) {

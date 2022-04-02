@@ -1,6 +1,6 @@
 use std::alloc;
 use std::alloc::Layout;
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::mem;
 use std::os::raw::c_char;
 use std::str;
@@ -24,7 +24,7 @@ pub extern "C" fn prepend_from_rust(ptr: *mut u8, len: usize) -> *const c_char {
         let cstr = CString::new(format!("From Rust: {}", s)).unwrap();
         let ret = cstr.as_ptr();
         mem::forget(cstr);
-        return ret
+        return ret;
     }
 }
 
@@ -38,7 +38,7 @@ pub extern "C" fn alloc(size: usize) -> *mut u8 {
 
 #[no_mangle]
 pub extern "C" fn dealloc(ptr: *mut u8, size: usize) {
-    unsafe  {
+    unsafe {
         let layout = Layout::from_size_align(size, mem::align_of::<u8>()).unwrap();
         alloc::dealloc(ptr, layout);
     }

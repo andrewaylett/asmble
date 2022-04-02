@@ -6,7 +6,7 @@ import eu.aylett.asmble.run.jvm.ModuleBuilder
 import eu.aylett.asmble.util.get
 import org.junit.Test
 import java.nio.ByteBuffer
-import java.util.*
+import java.util.UUID
 import kotlin.test.assertEquals
 
 class LargeDataTest : TestBase() {
@@ -16,14 +16,18 @@ class LargeDataTest : TestBase() {
         // We create a byte array across the whole gambit of bytes to test UTF8 encoding.
         val bytesExpected = ByteArray(70000) { ((it % 255) - Byte.MIN_VALUE).toByte() }
         val mod = Node.Module(
-            memories = listOf(Node.Type.Memory(
-                limits = Node.ResizableLimits(initial = 2, maximum = 2)
-            )),
-            data = listOf(Node.Data(
-                index = 0,
-                offset = listOf(Node.Instr.I32Const(0)),
-                data = bytesExpected
-            ))
+            memories = listOf(
+                Node.Type.Memory(
+                    limits = Node.ResizableLimits(initial = 2, maximum = 2)
+                )
+            ),
+            data = listOf(
+                Node.Data(
+                    index = 0,
+                    offset = listOf(Node.Instr.I32Const(0)),
+                    data = bytesExpected
+                )
+            )
         )
         val ctx = ClsContext(
             packageName = "test",

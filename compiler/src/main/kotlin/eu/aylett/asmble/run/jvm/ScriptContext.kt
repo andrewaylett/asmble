@@ -11,7 +11,7 @@ import eu.aylett.asmble.util.toRawLongBits
 import java.io.PrintWriter
 import java.lang.invoke.MethodHandle
 import java.lang.reflect.InvocationTargetException
-import java.util.*
+import java.util.UUID
 
 data class ScriptContext(
     val modules: List<Module> = emptyList(),
@@ -31,12 +31,15 @@ data class ScriptContext(
         is Script.Cmd.Module ->
             copy(modules = modules + buildModule(cmd.module, "Module${modules.size}", cmd.name))
         is Script.Cmd.Register ->
-            copy(registrations = registrations + (
-                cmd.string to (
-                    (if (cmd.name != null) modules.find { it.name == cmd.name } else modules.lastOrNull()) ?:
-                        error("No module to register")
-                )
-            ))
+            copy(
+                registrations = registrations + (
+                    cmd.string to (
+                        (if (cmd.name != null) modules.find { it.name == cmd.name } else modules.lastOrNull()) ?: error(
+                            "No module to register"
+                        )
+                        )
+                    )
+            )
         is Script.Cmd.Action ->
             doAction(cmd).let { this }
         is Script.Cmd.Assertion ->
@@ -66,8 +69,7 @@ data class ScriptContext(
     fun assertReturn(ret: Script.Cmd.Assertion.Return) {
         require(ret.exprs.size < 2)
         val retVal = doAction(ret.action)
-        val retType = retVal?.javaClass?.valueType
-        when (retType) {
+        when (val retType = retVal?.javaClass?.valueType) {
             null ->
                 if (ret.exprs.isNotEmpty())
                     throw ScriptAssertionError(ret, "Got empty return, expected not empty", retVal)
@@ -115,7 +117,9 @@ data class ScriptContext(
             doAction(trap.action).also {
                 throw ScriptAssertionError(trap, "Expected exception but completed successfully")
             }
-        } catch (e: Throwable) { assertFailure(trap, e, trap.failure) }
+        } catch (e: Throwable) {
+            assertFailure(trap, e, trap.failure)
+        }
     }
 
     fun assertMalformed(malformed: Script.Cmd.Assertion.Malformed) {
@@ -127,7 +131,9 @@ data class ScriptContext(
                 malformed,
                 "Expected malformed module with error '${malformed.failure}', was valid"
             )
-        } catch (e: Exception) { assertFailure(malformed, e, malformed.failure) }
+        } catch (e: Exception) {
+            assertFailure(malformed, e, malformed.failure)
+        }
     }
 
     fun assertInvalid(invalid: Script.Cmd.Assertion.Invalid) {
@@ -136,7 +142,9 @@ data class ScriptContext(
             val className = "invalid" + UUID.randomUUID().toString().replace("-", "")
             buildModule(invalid.module.value, className, null)
             throw ScriptAssertionError(invalid, "Expected invalid module with error '${invalid.failure}', was valid")
-        } catch (e: Exception) { assertFailure(invalid, e, invalid.failure) }
+        } catch (e: Exception) {
+            assertFailure(invalid, e, invalid.failure)
+        }
     }
 
     fun assertUnlinkable(unlink: Script.Cmd.Assertion.Unlinkable) {
@@ -144,7 +152,9 @@ data class ScriptContext(
             val className = "unlinkable" + UUID.randomUUID().toString().replace("-", "")
             buildModule(unlink.module, className, null)
             throw ScriptAssertionError(unlink, "Expected module link error with '${unlink.failure}', was valid")
-        } catch (e: Throwable) { assertFailure(unlink, e, unlink.failure) }
+        } catch (e: Throwable) {
+            assertFailure(unlink, e, unlink.failure)
+        }
     }
 
     fun assertTrapModule(trap: Script.Cmd.Assertion.TrapModule) {
@@ -152,12 +162,17 @@ data class ScriptContext(
             val className = "trapmod" + UUID.randomUUID().toString().replace("-", "")
             buildModule(trap.module, className, null)
             throw ScriptAssertionError(trap, "Expected module init error with '${trap.failure}', was valid")
-        } catch (e: Throwable) { assertFailure(trap, e, trap.failure) }
+        } catch (e: Throwable) {
+            assertFailure(trap, e, trap.failure)
+        }
     }
 
     fun assertExhaustion(exhaustion: Script.Cmd.Assertion.Exhaustion) {
-        try { doAction(exhaustion.action).also { throw ScriptAssertionError(exhaustion, "Expected exception") } }
-        catch (e: Throwable) { assertFailure(exhaustion, e, exhaustion.failure) }
+        try {
+            doAction(exhaustion.action).also { throw ScriptAssertionError(exhaustion, "Expected exception") }
+        } catch (e: Throwable) {
+            assertFailure(exhaustion, e, exhaustion.failure)
+        }
     }
 
     private fun exceptionFromCatch(e: Throwable) =
@@ -208,11 +223,13 @@ data class ScriptContext(
         debug { "Building expression: $insns" }
         val mod = Node.Module(
             exports = listOf(Node.Export("expr", Node.ExternalKind.FUNCTION, 0)),
-            funcs = listOf(Node.Func(
-                type = Node.Type.Func(emptyList(), retType),
-                locals = emptyList(),
-                instructions = insns
-            ))
+            funcs = listOf(
+                Node.Func(
+                    type = Node.Type.Func(emptyList(), retType),
+                    locals = emptyList(),
+                    instructions = insns
+                )
+            )
         )
         return buildModule(mod, "expr" + UUID.randomUUID().toString().replace("-", ""), null)
     }

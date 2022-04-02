@@ -13,10 +13,18 @@ import java.io.IOException;
 public class RegexTest {
     // Too slow to run regularly
     private static final String TOO_SLOW = "[a-q][^u-z]{13}x";
+    private static RustLib rustLib;
+    private static String twainText;
+    private static RustLib.Ptr preparedRustTarget;
+    private String pattern;
+
+    public RegexTest(String pattern) {
+        this.pattern = pattern;
+    }
 
     @Parameterized.Parameters(name = "pattern: {0}")
     public static String[] data() {
-        return new String[] {
+        return new String[]{
             "Twain",
             "(?i)Twain",
             "[a-z]shing",
@@ -37,21 +45,11 @@ public class RegexTest {
         };
     }
 
-    private static RustLib rustLib;
-    private static String twainText;
-    private static RustLib.Ptr preparedRustTarget;
-
     @BeforeClass
     public static void setUpClass() throws IOException {
         twainText = Main.loadTwainText();
         rustLib = new RustLib();
         preparedRustTarget = rustLib.prepareTarget(twainText);
-    }
-
-    private String pattern;
-
-    public RegexTest(String pattern) {
-        this.pattern = pattern;
     }
 
     @Test

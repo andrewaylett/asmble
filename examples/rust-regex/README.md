@@ -25,8 +25,8 @@ In release mode, the generated class is 903KB w/ ~575 methods. The output:
 I wanted to compare the Java regex engine with the Rust regex engine. Before running benchmarks, I wrote a
 [unit test](src/test/java/asmble/examples/rustregex/RegexTest.java) to test parity. I used the examples from the
 aforementioned [blog post](https://rust-leipzig.github.io/regex/2017/03/28/comparison-of-regex-engines/) to test with.
-The test simply confirms the Java regex library and the Rust regex library produce the same match counts across the
-Mark Twain corpus. To run the test, execute:
+The test simply confirms the Java regex library and the Rust regex library produce the same match counts across the Mark
+Twain corpus. To run the test, execute:
 
     gradlew --no-daemon :examples:rust-regex:test
 
@@ -130,7 +130,7 @@ To keep from making this a big long post like most benchmark posts tend to be, h
   in general there are some impedance mismatches with the WASM bytecode and the JVM bytecode.
 * Notice the low error numbers on the Rust versions. The error number is the deviation between invocations. This shows
   the WASM-to-JVM ends up quite deterministic (or maybe, that there is just too much cruft to JIT, heh).
-* If I were more serious about it, I'd check with other OS's, add more iterations, tweak some compiler options, include 
+* If I were more serious about it, I'd check with other OS's, add more iterations, tweak some compiler options, include
   regex pattern compilation speed benchmarks, and so on. But I just needed simple proof that speed is reasonable.
 
 Overall, this shows running Rust on the JVM to be entirely reasonable for certain types of workloads. There are still

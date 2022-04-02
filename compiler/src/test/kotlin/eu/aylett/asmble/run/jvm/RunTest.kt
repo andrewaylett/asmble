@@ -12,14 +12,15 @@ import kotlin.test.assertEquals
 @RunWith(Parameterized::class)
 class RunTest(unit: SpecTestUnit) : TestRunner<SpecTestUnit>(unit) {
 
-    override val builder get() = ModuleBuilder.Compiled(
-        packageName = unit.packageName,
-        logger = this,
-        adjustContext = { it.copy(eagerFailLargeMemOffset = false) },
-        // Include the binary data so we can check it later
-        includeBinaryInCompiledClass = true,
-        defaultMaxMemPages = unit.defaultMaxMemPages
-    )
+    override val builder
+        get() = ModuleBuilder.Compiled(
+            packageName = unit.packageName,
+            logger = this,
+            adjustContext = { it.copy(eagerFailLargeMemOffset = false) },
+            // Include the binary data so we can check it later
+            includeBinaryInCompiledClass = true,
+            defaultMaxMemPages = unit.defaultMaxMemPages
+        )
 
     override fun run() = super.run().also { scriptContext ->
         // Check annotations
@@ -35,7 +36,8 @@ class RunTest(unit: SpecTestUnit) : TestRunner<SpecTestUnit>(unit) {
     }
 
     companion object {
-        @JvmStatic @Parameterized.Parameters(name = "{0}")
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
         fun data() = SpecTestUnit.allUnits
     }
 }

@@ -9,13 +9,14 @@ class SpecTestUnit(name: String, wast: String, expectedOutput: String?) : BaseTe
 
     override val shouldFail get() = name.endsWith(".fail")
 
-    override val defaultMaxMemPages get() = when (name) {
-        "call", "call_indirect" -> 310
-        "globals", "imports", "select" -> 7
-        "memory_grow" -> 830
-        "nop" -> 20
-        else -> 2
-    }
+    override val defaultMaxMemPages
+        get() = when (name) {
+            "call", "call_indirect" -> 310
+            "globals", "imports", "select" -> 7
+            "memory_grow" -> 830
+            "nop" -> 20
+            else -> 2
+        }
 
     companion object {
         val unitsPath = "/spec/test/core"

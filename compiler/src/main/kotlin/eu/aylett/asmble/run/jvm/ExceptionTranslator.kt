@@ -1,10 +1,8 @@
 package eu.aylett.asmble.run.jvm
 
-import eu.aylett.asmble.AsmErr
 import java.lang.invoke.WrongMethodTypeException
-import java.nio.BufferOverflowException
 import java.nio.charset.MalformedInputException
-import java.util.*
+import java.util.Locale
 
 open class ExceptionTranslator {
     fun translate(ex: Throwable): List<String> = when (ex) {

@@ -45,7 +45,7 @@ pub extern "C" fn alloc(size: usize) -> *mut u8 {
 
 #[no_mangle]
 pub extern "C" fn dealloc(ptr: *mut u8, size: usize) {
-    unsafe  {
+    unsafe {
         let layout = Layout::from_size_align(size, mem::align_of::<u8>()).unwrap();
         alloc::dealloc(ptr, layout);
     }

@@ -189,7 +189,7 @@ open class InsnReworker {
                 // Grow memory requires "mem" before the single param
                 is Node.Instr.MemoryGrow ->
                     injectBeforeLastStackCount(Insn.MemNeededOnStack, 1)
-                else -> { }
+                else -> {}
             }
 
             // Log some trace output

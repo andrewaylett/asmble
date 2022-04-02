@@ -10,7 +10,7 @@ import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
 import java.lang.reflect.Constructor
 import java.lang.reflect.Modifier
-import java.util.*
+import java.util.Locale
 
 interface Module {
     val name: String?
@@ -27,6 +27,7 @@ interface Module {
             field: String,
             type: Node.Type.Global
         ): Pair<MethodHandle, MethodHandle?>
+
         fun <T> resolveImportMemory(module: String, field: String, type: Node.Type.Memory, memClass: Class<T>): T
         fun resolveImportTable(module: String, field: String, type: Node.Type.Table): Array<MethodHandle?>
     }
@@ -52,37 +53,53 @@ interface Module {
 
         override fun exportedFunc(field: String) = bindMethod(field, WasmExternalKind.FUNCTION, field.javaIdent)
         override fun exportedGlobal(field: String) =
-            bindMethod(field, WasmExternalKind.GLOBAL, "get" + field.javaIdent.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(
-                    Locale.getDefault()
-                ) else it.toString()
-            }, 0)?.let {
-                it to bindMethod(field, WasmExternalKind.GLOBAL, "set" + field.javaIdent.replaceFirstChar {
+            bindMethod(
+                field, WasmExternalKind.GLOBAL,
+                "get" + field.javaIdent.replaceFirstChar {
                     if (it.isLowerCase()) it.titlecase(
                         Locale.getDefault()
                     ) else it.toString()
-                }, 1)
+                },
+                0
+            )?.let {
+                it to bindMethod(
+                    field, WasmExternalKind.GLOBAL,
+                    "set" + field.javaIdent.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(
+                            Locale.getDefault()
+                        ) else it.toString()
+                    },
+                    1
+                )
             }
+
         override fun <T> exportedMemory(field: String, memClass: Class<T>) =
-            bindMethod(field, WasmExternalKind.MEMORY, "get" + field.javaIdent.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(
-                    Locale.getDefault()
-                ) else it.toString()
-            }, 0)?.
-                takeIf { it.type().returnType() == memClass }?.let {
+            bindMethod(
+                field, WasmExternalKind.MEMORY,
+                "get" + field.javaIdent.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(
+                        Locale.getDefault()
+                    ) else it.toString()
+                },
+                0
+            )?.takeIf { it.type().returnType() == memClass }?.let {
                 @Suppress("UNCHECKED_CAST")
                 it.invokeWithArguments() as? T
             }
+
         override fun exportedTable(field: String) =
-            bindMethod(field, WasmExternalKind.TABLE, "get" + field.javaIdent.replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase(
-                    Locale.getDefault()
-                ) else it.toString()
-            }, 0)?.
-                let {
-                    @Suppress("UNCHECKED_CAST")
-                    it.invokeWithArguments() as? Array<MethodHandle?>
-                }
+            bindMethod(
+                field, WasmExternalKind.TABLE,
+                "get" + field.javaIdent.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(
+                        Locale.getDefault()
+                    ) else it.toString()
+                },
+                0
+            )?.let {
+                @Suppress("UNCHECKED_CAST")
+                it.invokeWithArguments() as? Array<MethodHandle?>
+            }
     }
 
     data class Native(override val cls: Class<*>, override val name: String?, override val inst: Any) : Instance {
@@ -109,8 +126,10 @@ interface Module {
             val memLimit = if (memImport != null) {
                 constructor = cls.declaredConstructors.find { it.parameterTypes.firstOrNull()?.ref == mem.memType }
                 val memImportKind = memImport.kind as Node.Import.Kind.Memory
-                val memInst = imports.resolveImportMemory(memImport.module, memImport.field,
-                    memImportKind.type, Class.forName(mem.memType.asm.className))
+                val memInst = imports.resolveImportMemory(
+                    memImport.module, memImport.field,
+                    memImportKind.type, Class.forName(mem.memType.asm.className)
+                )
                 constructorParams += memInst
                 val (memLimit, memCap) = mem.limitAndCapacity(memInst)
                 if (memLimit < memImportKind.type.limits.initial * Mem.PAGE_SIZE)
@@ -141,11 +160,13 @@ interface Module {
             if (constructor == null) error("Unable to find suitable module constructor")
 
             // Function imports
-            constructorParams.addAll(mod.imports.mapNotNull {
-                if (it.kind is Node.Import.Kind.Func)
-                    imports.resolveImportFunc(it.module, it.field, mod.types[it.kind.typeIndex])
-                else null
-            })
+            constructorParams.addAll(
+                mod.imports.mapNotNull {
+                    if (it.kind is Node.Import.Kind.Func)
+                        imports.resolveImportFunc(it.module, it.field, mod.types[it.kind.typeIndex])
+                    else null
+                }
+            )
 
             // Global imports
             val globalImports = mod.imports.flatMap {

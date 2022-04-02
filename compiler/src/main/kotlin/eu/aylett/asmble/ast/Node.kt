@@ -1,6 +1,6 @@
 package eu.aylett.asmble.ast
 
-import java.util.*
+import java.util.Arrays
 import kotlin.reflect.KClass
 
 sealed class Node {
@@ -33,12 +33,15 @@ sealed class Node {
             object I32 : Value() {
                 override fun toString() = "I32"
             }
+
             object I64 : Value() {
                 override fun toString() = "I64"
             }
+
             object F32 : Value() {
                 override fun toString() = "F32"
             }
+
             object F64 : Value() {
                 override fun toString() = "F64"
             }
@@ -170,14 +173,36 @@ sealed class Node {
         // Interfaces to help extraction
         interface Args {
             interface None : Args
-            interface Type : Args { val type: Node.Type.Value? }
-            interface RelativeDepth : Args { val relativeDepth: Int }
-            interface Table : Args { val targetTable: List<Int>; val default: Int }
-            interface Index : Args { val index: Int }
-            interface Reserved : Args { val reserved: Boolean }
+            interface Type : Args {
+                val type: Node.Type.Value?
+            }
+
+            interface RelativeDepth : Args {
+                val relativeDepth: Int
+            }
+
+            interface Table : Args {
+                val targetTable: List<Int>
+                val default: Int
+            }
+
+            interface Index : Args {
+                val index: Int
+            }
+
+            interface Reserved : Args {
+                val reserved: Boolean
+            }
+
             interface ReservedIndex : Index, Reserved
-            interface AlignOffset : Args { val align: Int; val offset: Long }
-            interface Const<out T : Number> : Args { val value: T }
+            interface AlignOffset : Args {
+                val align: Int
+                val offset: Long
+            }
+
+            interface Const<out T : Number> : Args {
+                val value: T
+            }
         }
 
         // Control flow
@@ -194,6 +219,7 @@ sealed class Node {
             override val targetTable: List<Int>,
             override val default: Int
         ) : Instr(), Args.Table
+
         object Return : Instr()
 
         // Call operators
@@ -389,14 +415,20 @@ sealed class Node {
 
         sealed class ControlFlowOp<out A : Instr.Args> : InstrOp<A>() {
             data class NoArg(override val name: String, val create: Instr) : ControlFlowOp<Instr.Args.None>()
-            data class TypeArg(override val name: String, val create: (Type.Value?) -> Instr) : ControlFlowOp<Instr.Args.Type>()
-            data class DepthArg(override val name: String, val create: (Int) -> Instr) : ControlFlowOp<Instr.Args.RelativeDepth>()
-            data class TableArg(override val name: String, val create: (List<Int>, Int) -> Instr) : ControlFlowOp<Instr.Args.Table>()
+            data class TypeArg(override val name: String, val create: (Type.Value?) -> Instr) :
+                ControlFlowOp<Instr.Args.Type>()
+
+            data class DepthArg(override val name: String, val create: (Int) -> Instr) :
+                ControlFlowOp<Instr.Args.RelativeDepth>()
+
+            data class TableArg(override val name: String, val create: (List<Int>, Int) -> Instr) :
+                ControlFlowOp<Instr.Args.Table>()
         }
 
         sealed class CallOp<out A : Instr.Args> : InstrOp<A>() {
             data class IndexArg(override val name: String, val create: (Int) -> Instr) : CallOp<Instr.Args.Index>()
-            data class IndexReservedArg(override val name: String, val create: (Int, Boolean) -> Instr) : CallOp<Instr.Args.ReservedIndex>()
+            data class IndexReservedArg(override val name: String, val create: (Int, Boolean) -> Instr) :
+                CallOp<Instr.Args.ReservedIndex>()
         }
 
         sealed class ParamOp : InstrOp<Instr.Args.None>() {
@@ -408,7 +440,8 @@ sealed class Node {
         }
 
         sealed class MemOp<out A : Instr.Args> : InstrOp<A>() {
-            data class AlignOffsetArg(override val name: String, val create: (Int, Long) -> Instr) : MemOp<Instr.Args.AlignOffset>() {
+            data class AlignOffsetArg(override val name: String, val create: (Int, Long) -> Instr) :
+                MemOp<Instr.Args.AlignOffset>() {
                 val argBits = when (name) {
                     "i32.load8_s", "i32.load8_u", "i64.load8_s", "i64.load8_u",
                     "i32.store8", "i64.store8" -> 8
@@ -420,7 +453,9 @@ sealed class Node {
                     else -> error("Unrecognized op: $name")
                 }
             }
-            data class ReservedArg(override val name: String, val create: (Boolean) -> Instr) : MemOp<Instr.Args.Reserved>()
+
+            data class ReservedArg(override val name: String, val create: (Boolean) -> Instr) :
+                MemOp<Instr.Args.Reserved>()
         }
 
         sealed class ConstOp<out T : Number> : InstrOp<Instr.Args.Const<T>>() {
@@ -467,7 +502,8 @@ sealed class Node {
                     name: String,
                     opcode: Short,
                     newOp: (String, T) -> InstrOp<*>,
-                    create: T, clazz: KClass<out Instr>
+                    create: T,
+                    clazz: KClass<out Instr>
                 ) {
                     require(!strToOpMap.contains(name) && !classToOpMap.contains(clazz)) {
                         "Name '$name', class '$clazz', or op '$opcode' already exists"
@@ -492,7 +528,13 @@ sealed class Node {
                 opMapEntry("return", 0x0f, ::ControlFlowOpNoArg, Instr.Return, Instr.Return::class)
 
                 opMapEntry("call", 0x10, ::CallOpIndexArg, Instr::Call, Instr.Call::class)
-                opMapEntry("call_indirect", 0x11, ::CallOpIndexReservedArg, Instr::CallIndirect, Instr.CallIndirect::class)
+                opMapEntry(
+                    "call_indirect",
+                    0x11,
+                    ::CallOpIndexReservedArg,
+                    Instr::CallIndirect,
+                    Instr.CallIndirect::class
+                )
 
                 opMapEntry("drop", 0x1a, ParamOp::NoArg, Instr.Drop, Instr.Drop::class)
                 opMapEntry("select", 0x1b, ParamOp::NoArg, Instr.Select, Instr.Select::class)
@@ -645,21 +687,93 @@ sealed class Node {
                 opMapEntry("i64.trunc_u/f32", 0xaf, ConvertOp::NoArg, Instr.I64TruncUF32, Instr.I64TruncUF32::class)
                 opMapEntry("i64.trunc_s/f64", 0xb0, ConvertOp::NoArg, Instr.I64TruncSF64, Instr.I64TruncSF64::class)
                 opMapEntry("i64.trunc_u/f64", 0xb1, ConvertOp::NoArg, Instr.I64TruncUF64, Instr.I64TruncUF64::class)
-                opMapEntry("f32.convert_s/i32", 0xb2, ConvertOp::NoArg, Instr.F32ConvertSI32, Instr.F32ConvertSI32::class)
-                opMapEntry("f32.convert_u/i32", 0xb3, ConvertOp::NoArg, Instr.F32ConvertUI32, Instr.F32ConvertUI32::class)
-                opMapEntry("f32.convert_s/i64", 0xb4, ConvertOp::NoArg, Instr.F32ConvertSI64, Instr.F32ConvertSI64::class)
-                opMapEntry("f32.convert_u/i64", 0xb5, ConvertOp::NoArg, Instr.F32ConvertUI64, Instr.F32ConvertUI64::class)
+                opMapEntry(
+                    "f32.convert_s/i32",
+                    0xb2,
+                    ConvertOp::NoArg,
+                    Instr.F32ConvertSI32,
+                    Instr.F32ConvertSI32::class
+                )
+                opMapEntry(
+                    "f32.convert_u/i32",
+                    0xb3,
+                    ConvertOp::NoArg,
+                    Instr.F32ConvertUI32,
+                    Instr.F32ConvertUI32::class
+                )
+                opMapEntry(
+                    "f32.convert_s/i64",
+                    0xb4,
+                    ConvertOp::NoArg,
+                    Instr.F32ConvertSI64,
+                    Instr.F32ConvertSI64::class
+                )
+                opMapEntry(
+                    "f32.convert_u/i64",
+                    0xb5,
+                    ConvertOp::NoArg,
+                    Instr.F32ConvertUI64,
+                    Instr.F32ConvertUI64::class
+                )
                 opMapEntry("f32.demote/f64", 0xb6, ConvertOp::NoArg, Instr.F32DemoteF64, Instr.F32DemoteF64::class)
-                opMapEntry("f64.convert_s/i32", 0xb7, ConvertOp::NoArg, Instr.F64ConvertSI32, Instr.F64ConvertSI32::class)
-                opMapEntry("f64.convert_u/i32", 0xb8, ConvertOp::NoArg, Instr.F64ConvertUI32, Instr.F64ConvertUI32::class)
-                opMapEntry("f64.convert_s/i64", 0xb9, ConvertOp::NoArg, Instr.F64ConvertSI64, Instr.F64ConvertSI64::class)
-                opMapEntry("f64.convert_u/i64", 0xba, ConvertOp::NoArg, Instr.F64ConvertUI64, Instr.F64ConvertUI64::class)
+                opMapEntry(
+                    "f64.convert_s/i32",
+                    0xb7,
+                    ConvertOp::NoArg,
+                    Instr.F64ConvertSI32,
+                    Instr.F64ConvertSI32::class
+                )
+                opMapEntry(
+                    "f64.convert_u/i32",
+                    0xb8,
+                    ConvertOp::NoArg,
+                    Instr.F64ConvertUI32,
+                    Instr.F64ConvertUI32::class
+                )
+                opMapEntry(
+                    "f64.convert_s/i64",
+                    0xb9,
+                    ConvertOp::NoArg,
+                    Instr.F64ConvertSI64,
+                    Instr.F64ConvertSI64::class
+                )
+                opMapEntry(
+                    "f64.convert_u/i64",
+                    0xba,
+                    ConvertOp::NoArg,
+                    Instr.F64ConvertUI64,
+                    Instr.F64ConvertUI64::class
+                )
                 opMapEntry("f64.promote/f32", 0xbb, ConvertOp::NoArg, Instr.F64PromoteF32, Instr.F64PromoteF32::class)
 
-                opMapEntry("i32.reinterpret/f32", 0xbc, ReinterpretOp::NoArg, Instr.I32ReinterpretF32, Instr.I32ReinterpretF32::class)
-                opMapEntry("i64.reinterpret/f64", 0xbd, ReinterpretOp::NoArg, Instr.I64ReinterpretF64, Instr.I64ReinterpretF64::class)
-                opMapEntry("f32.reinterpret/i32", 0xbe, ReinterpretOp::NoArg, Instr.F32ReinterpretI32, Instr.F32ReinterpretI32::class)
-                opMapEntry("f64.reinterpret/i64", 0xbf, ReinterpretOp::NoArg, Instr.F64ReinterpretI64, Instr.F64ReinterpretI64::class)
+                opMapEntry(
+                    "i32.reinterpret/f32",
+                    0xbc,
+                    ReinterpretOp::NoArg,
+                    Instr.I32ReinterpretF32,
+                    Instr.I32ReinterpretF32::class
+                )
+                opMapEntry(
+                    "i64.reinterpret/f64",
+                    0xbd,
+                    ReinterpretOp::NoArg,
+                    Instr.I64ReinterpretF64,
+                    Instr.I64ReinterpretF64::class
+                )
+                opMapEntry(
+                    "f32.reinterpret/i32",
+                    0xbe,
+                    ReinterpretOp::NoArg,
+                    Instr.F32ReinterpretI32,
+                    Instr.F32ReinterpretI32::class
+                )
+                opMapEntry(
+                    "f64.reinterpret/i64",
+                    0xbf,
+                    ReinterpretOp::NoArg,
+                    Instr.F64ReinterpretI64,
+                    Instr.F64ReinterpretI64::class
+                )
 
                 this.strToOpMap = strToOpMap
                 this.classToOpMap = classToOpMap

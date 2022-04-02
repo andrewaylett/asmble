@@ -52,8 +52,8 @@ open class Compile : Command<Compile.Args>() {
             if (args.inFormat != "<use file extension>") args.inFormat
             else args.inFile.substringAfterLast('.', "<unknown>")
         val script = Translate().also { it.logger = logger }.inToAst(args.inFile, inFormat)
-        val mod = (script.commands.firstOrNull() as? Script.Cmd.Module) ?:
-            error("Only a single sexpr for (module) allowed")
+        val mod =
+            (script.commands.firstOrNull() as? Script.Cmd.Module) ?: error("Only a single sexpr for (module) allowed")
         val outStream = when (args.outFile) {
             "<outClass.class>" -> FileOutputStream(args.outClass.substringAfterLast('.') + ".class")
             "--" -> System.out

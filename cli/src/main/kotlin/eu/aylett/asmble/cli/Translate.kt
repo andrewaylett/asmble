@@ -2,7 +2,14 @@ package eu.aylett.asmble.cli
 
 import eu.aylett.asmble.ast.SExpr
 import eu.aylett.asmble.ast.Script
-import eu.aylett.asmble.io.*
+import eu.aylett.asmble.io.AstToBinary
+import eu.aylett.asmble.io.AstToSExpr
+import eu.aylett.asmble.io.BinaryToAst
+import eu.aylett.asmble.io.ByteReader
+import eu.aylett.asmble.io.ByteWriter
+import eu.aylett.asmble.io.SExprToAst
+import eu.aylett.asmble.io.SExprToStr
+import eu.aylett.asmble.io.StrToSExpr
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -66,8 +73,16 @@ open class Translate : Command<Translate.Args>() {
                 }
             }
             "wasm" ->
-                Script(listOf(Script.Cmd.Module(BinaryToAst(logger = logger).toModule(
-                    ByteReader.InputStream(inBytes.inputStream())), null)))
+                Script(
+                    listOf(
+                        Script.Cmd.Module(
+                            BinaryToAst(logger = logger).toModule(
+                                ByteReader.InputStream(inBytes.inputStream())
+                            ),
+                            null
+                        )
+                    )
+                )
             else -> error("Unknown in format '$inFormat'")
         }
     }
@@ -84,8 +99,8 @@ open class Translate : Command<Translate.Args>() {
                     outStream.write(sexprToStr.fromSExpr(*sexprs.toTypedArray()).toByteArray())
                 }
                 "wasm" -> {
-                    val mod = (script.commands.firstOrNull() as? Script.Cmd.Module)?.module ?:
-                    error("Output to WASM requires input be just a single module")
+                    val mod = (script.commands.firstOrNull() as? Script.Cmd.Module)?.module
+                        ?: error("Output to WASM requires input be just a single module")
                     AstToBinary.fromModule(ByteWriter.OutputStream(outStream), mod)
                 }
                 else -> error("Unknown out format '$outFormat'")

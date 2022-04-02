@@ -5,7 +5,17 @@ import eu.aylett.asmble.ast.Node.InstrOp
 import eu.aylett.asmble.ast.SExpr
 import eu.aylett.asmble.ast.Script
 import eu.aylett.asmble.compile.jvm.Mem
-import eu.aylett.asmble.util.*
+import eu.aylett.asmble.util.Either
+import eu.aylett.asmble.util.MAX_UINT32
+import eu.aylett.asmble.util.MAX_UINT64
+import eu.aylett.asmble.util.MIN_INT32
+import eu.aylett.asmble.util.MIN_INT64
+import eu.aylett.asmble.util.fromIntBits
+import eu.aylett.asmble.util.fromLongBits
+import eu.aylett.asmble.util.takeUntilNullLazy
+import eu.aylett.asmble.util.toUnsignedLong
+import eu.aylett.asmble.util.unsignedToSignedInt
+import eu.aylett.asmble.util.valueOf
 import java.io.ByteArrayInputStream
 import java.math.BigInteger
 
@@ -38,11 +48,14 @@ open class SExprToAst(
         if (name != null) index++
         val str = exp.vals[index].symbolStr()!!
         index++
-        return when(exp.vals.first().symbolStr()) {
+        return when (exp.vals.first().symbolStr()) {
             "invoke" ->
-                Script.Cmd.Action.Invoke(name, str, exp.vals.drop(index).map {
-                    toExprMaybe(it as SExpr.Multi, ExprContext.empty)
-                })
+                Script.Cmd.Action.Invoke(
+                    name, str,
+                    exp.vals.drop(index).map {
+                        toExprMaybe(it as SExpr.Multi, ExprContext.empty)
+                    }
+                )
             "get" ->
                 Script.Cmd.Action.Get(name, str)
             else -> throw Exception("Invalid action exp $exp")
@@ -51,10 +64,12 @@ open class SExprToAst(
 
     fun toAssertion(exp: SExpr.Multi): Script.Cmd.Assertion {
         val mult = exp.vals[1] as SExpr.Multi
-        return when(exp.vals.first().symbolStr()) {
+        return when (exp.vals.first().symbolStr()) {
             "assert_return" ->
-                Script.Cmd.Assertion.Return(toAction(mult),
-                    exp.vals.drop(2).map { toExprMaybe(it as SExpr.Multi, ExprContext.empty) })
+                Script.Cmd.Assertion.Return(
+                    toAction(mult),
+                    exp.vals.drop(2).map { toExprMaybe(it as SExpr.Multi, ExprContext.empty) }
+                )
             "assert_return_canonical_nan" ->
                 Script.Cmd.Assertion.ReturnNan(toAction(mult), canonical = true)
             "assert_return_arithmetic_nan" ->
@@ -88,13 +103,13 @@ open class SExprToAst(
         if (multi == null || multi.vals.firstOrNull()?.symbolStr() != "result") return emptyList()
         val types = multi.vals.drop(1).map { it.symbol()?.let { toTypeMaybe(it) } ?: error("Unknown type on $it") }
         // We can only handle one type for now
-        require(types.size  <= 1)
+        require(types.size <= 1)
         return types
     }
 
     fun toCmdMaybe(exp: SExpr.Multi): Script.Cmd? {
         val expName = exp.vals.first().symbolStr()
-        return when(expName) {
+        return when (expName) {
             "module" ->
                 toModule(exp).let { Script.Cmd.Module(it.second, it.first) }
             "register" ->
@@ -155,7 +170,7 @@ open class SExprToAst(
         exp.requireFirstSymbol("export")
         val field = exp.vals[1].symbolUtf8Str()!!
         val kind = exp.vals[2] as SExpr.Multi
-        val extKind = when(kind.vals[0].symbolStr()) {
+        val extKind = when (kind.vals[0].symbolStr()) {
             "func" -> Node.ExternalKind.FUNCTION
             "global" -> Node.ExternalKind.GLOBAL
             "table" -> Node.ExternalKind.TABLE
@@ -186,13 +201,13 @@ open class SExprToAst(
 
         val sigs = toBlockSigMaybe(exp, opOffset)
         opOffset += sigs.size
-        when(blockName) {
+        when (blockName) {
             "block" ->
                 return listOf(Node.Instr.Block(sigs.firstOrNull())) +
-                        toInstrs(exp, opOffset, innerCtx).first + Node.Instr.End
+                    toInstrs(exp, opOffset, innerCtx).first + Node.Instr.End
             "loop" ->
                 return listOf(Node.Instr.Loop(sigs.firstOrNull())) +
-                        toInstrs(exp, opOffset, innerCtx).first + Node.Instr.End
+                    toInstrs(exp, opOffset, innerCtx).first + Node.Instr.End
             "if" -> {
                 if (opOffset >= exp.vals.size) return emptyList()
                 var ret = emptyList<Node.Instr>()
@@ -215,7 +230,11 @@ open class SExprToAst(
                 if (opOffset < exp.vals.size) {
                     ret += Node.Instr.Else
                     exprMulti = exp.vals[opOffset] as SExpr.Multi
-                    if (exprMulti.vals.firstOrNull()?.symbolStr() == "else") ret += toInstrs(exprMulti, 1, innerCtx).first
+                    if (exprMulti.vals.firstOrNull()?.symbolStr() == "else") ret += toInstrs(
+                        exprMulti,
+                        1,
+                        innerCtx
+                    ).first
                     else ret += toExprMaybe(exprMulti, innerCtx)
                 }
                 return ret + Node.Instr.End
@@ -282,8 +301,9 @@ open class SExprToAst(
         if (results.size > 1) throw IoErr.InvalidResultArity()
         val usedExps = params.size + resultExps.size + if (typeRef == null) 0 else 1
         // Make sure there aren't parameters following the result
-        if (resultExps.isNotEmpty() && (exp.vals.getOrNull(offset + params.size + resultExps.size) as? SExpr.Multi)?.
-                vals?.firstOrNull()?.symbolStr() == "param") {
+        if (resultExps.isNotEmpty() && (exp.vals.getOrNull(offset + params.size + resultExps.size) as? SExpr.Multi)?.vals?.firstOrNull()
+            ?.symbolStr() == "param"
+        ) {
             throw IoErr.ResultBeforeParameter()
         }
         // Check against type ref
@@ -313,7 +333,7 @@ open class SExprToAst(
         return Triple(name, Node.Global(sig, instrs), maybeImpExp)
     }
 
-    fun toGlobalSig(exp: SExpr): Node.Type.Global = when(exp) {
+    fun toGlobalSig(exp: SExpr): Node.Type.Global = when (exp) {
         is SExpr.Symbol -> Node.Type.Global(toType(exp), false)
         is SExpr.Multi -> {
             exp.vals.first().requireSymbol("mut")
@@ -332,13 +352,16 @@ open class SExprToAst(
         val kind = exp.vals[3] as SExpr.Multi
         val kindName = kind.vals.firstOrNull()?.symbolStr()
         val kindSubOffset = if (kind.maybeName(1) == null) 1 else 2
-        return Triple(module, field, when(kindName) {
-            "func" -> toFuncSig(kind, kindSubOffset, origNameMap, types).third
-            "global" -> toGlobalSig(kind.vals[kindSubOffset])
-            "table" -> toTableSig(kind, kindSubOffset)
-            "memory" -> toMemorySig(kind, kindSubOffset)
-            else -> throw Exception("Unrecognized type: $kindName")
-        })
+        return Triple(
+            module, field,
+            when (kindName) {
+                "func" -> toFuncSig(kind, kindSubOffset, origNameMap, types).third
+                "global" -> toGlobalSig(kind.vals[kindSubOffset])
+                "table" -> toTableSig(kind, kindSubOffset)
+                "memory" -> toMemorySig(kind, kindSubOffset)
+                else -> throw Exception("Unrecognized type: $kindName")
+            }
+        )
     }
 
     fun toImportOrExportMaybe(exp: SExpr.Multi, offset: Int): ImportOrExport? {
@@ -406,7 +429,7 @@ open class SExprToAst(
         val sigs = toBlockSigMaybe(exp, offset + opOffset)
         opOffset += sigs.size
         var ret = emptyList<Node.Instr>()
-        when(blockName) {
+        when (blockName) {
             "block" -> {
                 ret += Node.Instr.Block(sigs.firstOrNull())
                 toInstrs(exp, offset + opOffset, innerCtx, false).also {
@@ -474,11 +497,13 @@ open class SExprToAst(
             when (it) {
                 is SExpr.Multi -> {
                     it.requireFirstSymbol("data")
-                    Either.Right(Node.Data(
-                        0,
-                        listOf(Node.Instr.I32Const(0)),
-                        it.vals.drop(1).fold(byteArrayOf()) { b, exp -> b + exp.symbol()!!.rawContentCharsToBytes() }
-                    ))
+                    Either.Right(
+                        Node.Data(
+                            0,
+                            listOf(Node.Instr.I32Const(0)),
+                            it.vals.drop(1).fold(byteArrayOf()) { b, exp -> b + exp.symbol()!!.rawContentCharsToBytes() }
+                        )
+                    )
                 }
                 else -> Either.Left(toMemorySig(exp, currIndex))
             }
@@ -493,7 +518,7 @@ open class SExprToAst(
     fun toMeta(exp: SExpr.Multi): Script.Cmd.Meta {
         val name = exp.maybeName(1)
         val index = if (name == null) 1 else 2
-        return when(exp.vals.first().symbolStr()) {
+        return when (exp.vals.first().symbolStr()) {
             "script" -> Script.Cmd.Meta.Script(name, toScript(exp.vals[index] as SExpr.Multi))
             "input" -> Script.Cmd.Meta.Input(name, exp.vals[index].symbolStr()!!)
             "output" -> Script.Cmd.Meta.Output(name, if (index >= exp.vals.size) null else exp.vals[index].symbolStr())
@@ -510,13 +535,13 @@ open class SExprToAst(
         val name = exp.maybeName(1)
 
         // Special cases for "quote" and "binary" modules.
-        val quoteOrBinary = exp.vals.elementAtOrNull(if (name == null) 1 else 2)?.
-            symbolStr()?.takeIf { it == "quote" || it == "binary" }
+        val quoteOrBinary = exp.vals.elementAtOrNull(if (name == null) 1 else 2)?.symbolStr()
+            ?.takeIf { it == "quote" || it == "binary" }
         if (quoteOrBinary != null) {
             val bytes = exp.vals.drop(if (name == null) 2 else 3).fold(byteArrayOf()) { bytes, expr ->
                 bytes + (
                     expr.symbol()?.takeIf { it.quoted }?.rawContentCharsToBytes() ?: error("Expected quoted string")
-                )
+                    )
             }
             // For binary, just load from bytes
             if (quoteOrBinary == "binary") return name to toModuleFromBytes(bytes)
@@ -548,7 +573,7 @@ open class SExprToAst(
             if (mod.globals.isNotEmpty()) throw IoErr.ImportAfterNonImport("global")
             if (mod.tables.isNotEmpty()) throw IoErr.ImportAfterNonImport("table")
             if (mod.memories.isNotEmpty()) throw IoErr.ImportAfterNonImport("memory")
-            val (importKind, indexAndExtKind) = when(kind) {
+            val (importKind, indexAndExtKind) = when (kind) {
                 is Node.Type.Func -> mod.addTypeIfNotPresent(kind).let { (m, idx) ->
                     mod = m
                     Node.Import.Kind.Func(idx) to (funcCount++ to Node.ExternalKind.FUNCTION)
@@ -576,12 +601,12 @@ open class SExprToAst(
 
         // Now just handle all expressions in order
         exps.forEach { exp ->
-            when(exp.vals.firstOrNull()?.symbolStr()) {
+            when (exp.vals.firstOrNull()?.symbolStr()) {
                 "import" -> toImport(exp, nameMap, mod.types).let { (module, field, type) ->
                     handleImport(module, field, type, emptyList())
                 }
                 // We do not handle types here anymore. They are handled eagerly as part of the forward pass.
-                "type" -> { }
+                "type" -> {}
                 "export" -> mod = mod.copy(exports = mod.exports + toExport(exp, nameMap))
                 "elem" -> mod = mod.copy(elems = mod.elems + toElem(exp, nameMap))
                 "data" -> mod = mod.copy(data = mod.data + toData(exp, nameMap))
@@ -685,11 +710,11 @@ open class SExprToAst(
         // We break into import and non-import because the index
         // tables do imports first
         val (importExps, nonImportExps) = exps.partition {
-            when(it.vals.firstOrNull()?.symbolStr()) {
+            when (it.vals.firstOrNull()?.symbolStr()) {
                 "import" -> true
                 "func", "global", "table", "memory" -> {
-                    (it.vals.getOrNull(if (it.maybeName(1) == null) 1 else 2) as? SExpr.Multi)?.
-                        vals?.firstOrNull()?.symbolStr() == "import"
+                    (it.vals.getOrNull(if (it.maybeName(1) == null) 1 else 2) as? SExpr.Multi)?.vals?.firstOrNull()
+                        ?.symbolStr() == "import"
                 }
                 else -> false
             }
@@ -750,10 +775,10 @@ open class SExprToAst(
         // Some are not handled here:
         when (head.contents) {
             "block", "loop", "if", "else", "end" -> return null
-            else -> { }
+            else -> {}
         }
         val op = InstrOp.strToOpMap[head.contents]
-        return when(op) {
+        return when (op) {
             null -> null
             is InstrOp.ControlFlowOp.NoArg -> Pair(op.create, 1)
             is InstrOp.ControlFlowOp.TypeArg -> return null // Type not handled here
@@ -792,11 +817,14 @@ open class SExprToAst(
                     funcTypeIndex += ctx.types.size
                 }
                 Pair(op.create(funcTypeIndex, false), expsUsed + 1)
-
             }
             is InstrOp.ParamOp.NoArg -> Pair(op.create, 1)
-            is InstrOp.VarOp.IndexArg -> Pair(op.create(
-                oneVar(if (head.contents.endsWith("global")) "global" else "local")), 2)
+            is InstrOp.VarOp.IndexArg -> Pair(
+                op.create(
+                    oneVar(if (head.contents.endsWith("global")) "global" else "local")
+                ),
+                2
+            )
             is InstrOp.MemOp.AlignOffsetArg -> {
                 var count = 1
                 var instrOffset = 0L
@@ -891,11 +919,13 @@ open class SExprToAst(
                 require(maybeImpExp !is ImportOrExport.Import)
                 val elem = exp.vals[currIndex + 1] as SExpr.Multi
                 elem.requireFirstSymbol("elem")
-                Either.Right(Node.Elem(
-                    0,
-                    listOf(Node.Instr.I32Const(0)),
-                    elem.vals.drop(1).map { toVar(it.symbol()!!, nameMap, "func") }
-                ))
+                Either.Right(
+                    Node.Elem(
+                        0,
+                        listOf(Node.Instr.I32Const(0)),
+                        elem.vals.drop(1).map { toVar(it.symbol()!!, nameMap, "func") }
+                    )
+                )
             } else Either.Left(toTableSig(exp, currIndex))
         return Triple(name, tableOrElems, maybeImpExp)
     }
@@ -909,7 +939,7 @@ open class SExprToAst(
         return toTypeMaybe(exp) ?: throw IoErr.InvalidType(exp.contents)
     }
 
-    fun toTypeMaybe(exp: SExpr.Symbol): Node.Type.Value? = when(exp.contents) {
+    fun toTypeMaybe(exp: SExpr.Symbol): Node.Type.Value? = when (exp.contents) {
         "i32" -> Node.Type.Value.I32
         "i64" -> Node.Type.Value.I64
         "f32" -> Node.Type.Value.F32
@@ -934,8 +964,8 @@ open class SExprToAst(
     fun toVarMaybe(exp: SExpr, nameMap: NameMap, nameType: String): Int? {
         return exp.symbolStr()?.let { it ->
             if (it.startsWith("$"))
-                nameMap.get(nameType, it.drop(1)) ?:
-                    throw Exception("Unable to find index for name $it of type $nameType in $nameMap")
+                nameMap.get(nameType, it.drop(1))
+                    ?: throw Exception("Unable to find index for name $it of type $nameType in $nameMap")
             else if (it.startsWith("0x")) it.substring(2).toIntOrNull(16)
             else it.toIntOrNull()
         }
@@ -946,35 +976,38 @@ open class SExprToAst(
         fun isDigit(c: Char) = c.isDigit() || (startsWith("0x", true) && (c in 'a'..'f' || c in 'A'..'F'))
         var ret = this
         var underscoreIndex = 0
-        while (true){
+        while (true) {
             underscoreIndex = ret.indexOf('_', underscoreIndex)
             if (underscoreIndex == -1) return ret
             // Can't be at beginning or end
             if (underscoreIndex == 0 || underscoreIndex == ret.length - 1 ||
-                    !isDigit(ret[underscoreIndex - 1]) || !isDigit(ret[underscoreIndex + 1])) {
+                !isDigit(ret[underscoreIndex - 1]) || !isDigit(ret[underscoreIndex + 1])
+            ) {
                 throw IoErr.ConstantUnknownOperator(this)
             }
             ret = ret.removeRange(underscoreIndex, underscoreIndex + 1)
         }
     }
+
     private fun String.toBigIntegerConst() =
         if (contains("0x")) BigInteger(replace("0x", ""), 16)
         else BigInteger(this)
+
     private fun String.toIntConst() = sansUnderscores().run {
-        toBigIntegerConst().
-            also { if (it > MAX_UINT32) throw IoErr.ConstantOutOfRange(it) }.
-            also { if (it < MIN_INT32) throw IoErr.ConstantOutOfRange(it) }.
-            toInt()
+        toBigIntegerConst().also { if (it > MAX_UINT32) throw IoErr.ConstantOutOfRange(it) }
+            .also { if (it < MIN_INT32) throw IoErr.ConstantOutOfRange(it) }.toInt()
     }
+
     private fun String.toLongConst() = sansUnderscores().run {
-        toBigIntegerConst().
-            also { if (it > MAX_UINT64) throw IoErr.ConstantOutOfRange(it) }.
-            also { if (it < MIN_INT64) throw IoErr.ConstantOutOfRange(it) }.
-            toLong()
+        toBigIntegerConst().also { if (it > MAX_UINT64) throw IoErr.ConstantOutOfRange(it) }
+            .also { if (it < MIN_INT64) throw IoErr.ConstantOutOfRange(it) }.toLong()
     }
+
     private fun String.toUnsignedIntConst() = sansUnderscores().run {
-        (if (contains("0x")) Long.valueOf(replace("0x", ""), 16)
-        else Long.valueOf(this)).unsignedToSignedInt().toUnsignedLong()
+        (
+            if (contains("0x")) Long.valueOf(replace("0x", ""), 16)
+            else Long.valueOf(this)
+            ).unsignedToSignedInt().toUnsignedLong()
     }
 
     private fun String.toFloatConst() = sansUnderscores().run {
@@ -993,6 +1026,7 @@ open class SExprToAst(
             str.toFloat().also { if (it.isInfinite()) throw IoErr.ConstantOutOfRange(it) }
         }
     }
+
     private fun String.toDoubleConst() = sansUnderscores().run {
         if (this == "infinity" || this == "+infinity" || this == "inf" || this == "+inf") Double.POSITIVE_INFINITY
         else if (this == "-infinity" || this == "-inf") Double.NEGATIVE_INFINITY
@@ -1002,7 +1036,7 @@ open class SExprToAst(
             0x7ff0000000000000 + this.substring(this.indexOf(':') + 1).toLongConst()
         ) else if (this.startsWith("-nan:")) Double.fromLongBits(
             -4503599627370496 + this.substring(this.indexOf(':') + 1).toLongConst() // i.e. 0xfff0000000000000
-        )  else {
+        ) else {
             // If there is no "p" on a hex, we have to add it
             var str = this
             if (str.startsWith("0x", true) && !str.contains('P', true)) str += "p0"
@@ -1012,12 +1046,12 @@ open class SExprToAst(
 
     private fun SExpr.requireSymbol(contents: String, quotedCheck: Boolean? = null) {
         if (this is SExpr.Symbol && this.contents == contents &&
-                (quotedCheck == null || this.quoted == quotedCheck)) {
+            (quotedCheck == null || this.quoted == quotedCheck)
+        ) {
             return
         }
         throw Exception("Expected symbol of $contents, got $this")
     }
-
 
     private fun SExpr.symbol() = this as? SExpr.Symbol
     private fun SExpr.symbolStr() = this.symbol()?.contents

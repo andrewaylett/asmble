@@ -10,11 +10,19 @@ import eu.aylett.asmble.io.ByteWriter
 import eu.aylett.asmble.util.Either
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
-import org.objectweb.asm.tree.*
+import org.objectweb.asm.tree.AnnotationNode
+import org.objectweb.asm.tree.FieldInsnNode
+import org.objectweb.asm.tree.FieldNode
+import org.objectweb.asm.tree.InsnNode
+import org.objectweb.asm.tree.LdcInsnNode
+import org.objectweb.asm.tree.MethodInsnNode
+import org.objectweb.asm.tree.MethodNode
+import org.objectweb.asm.tree.TypeInsnNode
+import org.objectweb.asm.tree.VarInsnNode
 import java.io.ByteArrayOutputStream
 import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
-import java.util.*
+import java.util.Locale
 
 open class AstToAsm {
     // Note, the class does not have a name out of here (yet)
@@ -33,34 +41,58 @@ open class AstToAsm {
     private fun addFields(ctx: ClsContext) {
         // Mem field if present
         if (ctx.hasMemory)
-            ctx.cls.fields.add(FieldNode(Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, "memory",
-                ctx.mem.memType.asmDesc, null, null))
+            ctx.cls.fields.add(
+                FieldNode(
+                    Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, "memory",
+                    ctx.mem.memType.asmDesc, null, null
+                )
+            )
         // Table field if present...
         // Private final for now, but likely won't be final in future versions supporting
         // mutable tables, may be not even a table but a list (and final)
         if (ctx.hasTable)
-            ctx.cls.fields.add(FieldNode(Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, "table",
-                Array<MethodHandle>::class.ref.asmDesc, null, null))
+            ctx.cls.fields.add(
+                FieldNode(
+                    Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, "table",
+                    Array<MethodHandle>::class.ref.asmDesc, null, null
+                )
+            )
         // Now all method imports as method handles
-        ctx.cls.fields.addAll(ctx.importFuncs.indices.map {
-            FieldNode(Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, ctx.funcName(it),
-                MethodHandle::class.ref.asmDesc, null, null)
-        })
+        ctx.cls.fields.addAll(
+            ctx.importFuncs.indices.map {
+                FieldNode(
+                    Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, ctx.funcName(it),
+                    MethodHandle::class.ref.asmDesc, null, null
+                )
+            }
+        )
         // Now all import globals as getter (and maybe setter) method handles
-        ctx.cls.fields.addAll(ctx.importGlobals.mapIndexed { index, import ->
-            val getter = FieldNode(Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, ctx.importGlobalGetterFieldName(index),
-                MethodHandle::class.ref.asmDesc, null, null)
-            if (!(import.kind as Node.Import.Kind.Global).type.mutable) listOf(getter)
-            else listOf(getter, FieldNode(
-                Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, ctx.importGlobalSetterFieldName(index),
-                MethodHandle::class.ref.asmDesc, null, null))
-        }.flatten())
+        ctx.cls.fields.addAll(
+            ctx.importGlobals.mapIndexed { index, import ->
+                val getter = FieldNode(
+                    Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, ctx.importGlobalGetterFieldName(index),
+                    MethodHandle::class.ref.asmDesc, null, null
+                )
+                if (!(import.kind as Node.Import.Kind.Global).type.mutable) listOf(getter)
+                else listOf(
+                    getter,
+                    FieldNode(
+                        Opcodes.ACC_PRIVATE + Opcodes.ACC_FINAL, ctx.importGlobalSetterFieldName(index),
+                        MethodHandle::class.ref.asmDesc, null, null
+                    )
+                )
+            }.flatten()
+        )
         // Now all non-import globals
-        ctx.cls.fields.addAll(ctx.mod.globals.mapIndexed { index, global ->
-            val access = Opcodes.ACC_PRIVATE + if (!global.type.mutable) Opcodes.ACC_FINAL else 0
-            FieldNode(access, ctx.globalName(ctx.importGlobals.size + index),
-                global.type.contentType.typeRef.asmDesc, null, null)
-        })
+        ctx.cls.fields.addAll(
+            ctx.mod.globals.mapIndexed { index, global ->
+                val access = Opcodes.ACC_PRIVATE + if (!global.type.mutable) Opcodes.ACC_FINAL else 0
+                FieldNode(
+                    access, ctx.globalName(ctx.importGlobals.size + index),
+                    global.type.contentType.typeRef.asmDesc, null, null
+                )
+            }
+        )
     }
 
     private fun addConstructors(ctx: ClsContext) {
@@ -164,113 +196,123 @@ open class AstToAsm {
     }
 
     private fun addMemDefaultConstructor(ctx: ClsContext) {
-        //<init>(imports...) only if there was a given max
+        // <init>(imports...) only if there was a given max
         // Just defer to the maxMem int one
         val memoryMax = ctx.mod.memories.first().limits.maximum ?: return
         val importTypes = constructorImportTypes(ctx)
         val desc = "(I${importTypes.map { it.asmDesc }.joinToString("")})V"
-        val func = Func("<init>", importTypes).
-            addInsns(
-                VarInsnNode(Opcodes.ALOAD, 0),
-                (memoryMax * Mem.PAGE_SIZE).const
-            ).
-            addInsns(importTypes.indices.map { VarInsnNode(Opcodes.ALOAD, it + 1) }).
-            addInsns(
-                MethodInsnNode(Opcodes.INVOKESPECIAL, ctx.thisRef.asmName, "<init>", desc, false),
-                InsnNode(Opcodes.RETURN)
-            )
+        val func = Func("<init>", importTypes).addInsns(
+            VarInsnNode(Opcodes.ALOAD, 0),
+            (memoryMax * Mem.PAGE_SIZE).const
+        ).addInsns(importTypes.indices.map { VarInsnNode(Opcodes.ALOAD, it + 1) }).addInsns(
+            MethodInsnNode(Opcodes.INVOKESPECIAL, ctx.thisRef.asmName, "<init>", desc, false),
+            InsnNode(Opcodes.RETURN)
+        )
         ctx.cls.methods.add(toConstructorNode(ctx, func))
     }
 
     fun constructorImportTypes(ctx: ClsContext) =
         ctx.importFuncs.map { MethodHandle::class.ref } +
-        ctx.importGlobals.flatMap {
-            // If it's mutable, it also comes with a setter
-            if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == false) listOf(MethodHandle::class.ref)
-            else listOf(MethodHandle::class.ref, MethodHandle::class.ref)
-        } + ctx.mod.imports.filter { it.kind is Node.Import.Kind.Table }.map { Array<MethodHandle>::class.ref }
+            ctx.importGlobals.flatMap {
+                // If it's mutable, it also comes with a setter
+                if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == false) listOf(MethodHandle::class.ref)
+                else listOf(MethodHandle::class.ref, MethodHandle::class.ref)
+            } + ctx.mod.imports.filter { it.kind is Node.Import.Kind.Table }.map { Array<MethodHandle>::class.ref }
 
-    private fun toConstructorNode(ctx: ClsContext, func: Func) = mutableListOf<List<AnnotationNode>>().let { paramAnns ->
-        // If the first param is a mem class and imported, add annotation
-        // Otherwise if it is a mem class and not-imported or an int, no annotations
-        // Otherwise do nothing because the rest of the params are imports
-        func.params.firstOrNull()?.also { firstParam ->
-            if (firstParam == Int::class.ref) {
-                paramAnns.add(emptyList())
-            } else if (firstParam == ctx.mem.memType) {
-                val importMem = ctx.mod.imports.find { it.kind is Node.Import.Kind.Memory }
-                if (importMem == null) paramAnns.add(emptyList())
-                else paramAnns.add(listOf(importAnnotation(ctx, importMem)))
-            }
-        }
-        // All non-mem imports one after another
-        ctx.importFuncs.forEach { paramAnns.add(listOf(importAnnotation(ctx, it))) }
-        ctx.importGlobals.forEach {
-            paramAnns.add(listOf(importAnnotation(ctx, it)))
-            // There are two annotations here if it's mutable
-            if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == true)
-                paramAnns.add(listOf(importAnnotation(ctx, it).also {
-                    it.values.add("globalSetter")
-                    it.values.add(true)
-                }))
-        }
-        ctx.mod.imports.forEach {
-            if (it.kind is Node.Import.Kind.Table) paramAnns.add(listOf(importAnnotation(ctx, it)))
-        }
-        func.toMethodNode().also { it.visibleParameterAnnotations = paramAnns.toTypedArray() }
-    }
-
-    private fun importAnnotation(ctx: ClsContext, import: Node.Import) = AnnotationNode(WasmImport::class.ref.asmDesc).also {
-        it.values = mutableListOf<Any>("module", import.module, "field", import.field)
-        fun addValues(desc: String, limits: Node.ResizableLimits? = null) {
-            it.values.add("desc")
-            it.values.add(desc)
-            if (limits != null) {
-                it.values.add("resizableLimitInitial")
-                it.values.add(limits.initial)
-                if (limits.maximum != null) {
-                    it.values.add("resizableLimitMaximum")
-                    it.values.add(limits.maximum)
+    private fun toConstructorNode(ctx: ClsContext, func: Func) =
+        mutableListOf<List<AnnotationNode>>().let { paramAnns ->
+            // If the first param is a mem class and imported, add annotation
+            // Otherwise if it is a mem class and not-imported or an int, no annotations
+            // Otherwise do nothing because the rest of the params are imports
+            func.params.firstOrNull()?.also { firstParam ->
+                if (firstParam == Int::class.ref) {
+                    paramAnns.add(emptyList())
+                } else if (firstParam == ctx.mem.memType) {
+                    val importMem = ctx.mod.imports.find { it.kind is Node.Import.Kind.Memory }
+                    if (importMem == null) paramAnns.add(emptyList())
+                    else paramAnns.add(listOf(importAnnotation(ctx, importMem)))
                 }
             }
-            it.values.add("kind")
-            it.values.add(arrayOf(
-                WasmExternalKind::class.ref.asmDesc, when (import.kind) {
-                is Node.Import.Kind.Func -> WasmExternalKind.FUNCTION.name
-                is Node.Import.Kind.Table -> WasmExternalKind.TABLE.name
-                is Node.Import.Kind.Memory -> WasmExternalKind.MEMORY.name
-                is Node.Import.Kind.Global -> WasmExternalKind.GLOBAL.name
-            }))
+            // All non-mem imports one after another
+            ctx.importFuncs.forEach { paramAnns.add(listOf(importAnnotation(ctx, it))) }
+            ctx.importGlobals.forEach {
+                paramAnns.add(listOf(importAnnotation(ctx, it)))
+                // There are two annotations here if it's mutable
+                if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == true)
+                    paramAnns.add(
+                        listOf(
+                            importAnnotation(ctx, it).also {
+                                it.values.add("globalSetter")
+                                it.values.add(true)
+                            }
+                        )
+                    )
+            }
+            ctx.mod.imports.forEach {
+                if (it.kind is Node.Import.Kind.Table) paramAnns.add(listOf(importAnnotation(ctx, it)))
+            }
+            func.toMethodNode().also { it.visibleParameterAnnotations = paramAnns.toTypedArray() }
         }
-        when (import.kind) {
-            is Node.Import.Kind.Func ->
-                ctx.typeAtIndex(import.kind.typeIndex).let { addValues(it.asmDesc) }
-            is Node.Import.Kind.Table ->
-                addValues(Array<MethodHandle>::class.ref.asMethodRetDesc(), import.kind.type.limits)
-            is Node.Import.Kind.Memory ->
-                addValues(ctx.mem.memType.asMethodRetDesc(), import.kind.type.limits)
-            is Node.Import.Kind.Global ->
-                addValues(import.kind.type.contentType.typeRef.asMethodRetDesc())
+
+    private fun importAnnotation(ctx: ClsContext, import: Node.Import) =
+        AnnotationNode(WasmImport::class.ref.asmDesc).also {
+            it.values = mutableListOf<Any>("module", import.module, "field", import.field)
+            fun addValues(desc: String, limits: Node.ResizableLimits? = null) {
+                it.values.add("desc")
+                it.values.add(desc)
+                if (limits != null) {
+                    it.values.add("resizableLimitInitial")
+                    it.values.add(limits.initial)
+                    if (limits.maximum != null) {
+                        it.values.add("resizableLimitMaximum")
+                        it.values.add(limits.maximum)
+                    }
+                }
+                it.values.add("kind")
+                it.values.add(
+                    arrayOf(
+                        WasmExternalKind::class.ref.asmDesc,
+                        when (import.kind) {
+                            is Node.Import.Kind.Func -> WasmExternalKind.FUNCTION.name
+                            is Node.Import.Kind.Table -> WasmExternalKind.TABLE.name
+                            is Node.Import.Kind.Memory -> WasmExternalKind.MEMORY.name
+                            is Node.Import.Kind.Global -> WasmExternalKind.GLOBAL.name
+                        }
+                    )
+                )
+            }
+            when (import.kind) {
+                is Node.Import.Kind.Func ->
+                    ctx.typeAtIndex(import.kind.typeIndex).let { addValues(it.asmDesc) }
+                is Node.Import.Kind.Table ->
+                    addValues(Array<MethodHandle>::class.ref.asMethodRetDesc(), import.kind.type.limits)
+                is Node.Import.Kind.Memory ->
+                    addValues(ctx.mem.memType.asMethodRetDesc(), import.kind.type.limits)
+                is Node.Import.Kind.Global ->
+                    addValues(import.kind.type.contentType.typeRef.asMethodRetDesc())
+            }
         }
-    }
 
     private fun setConstructorGlobalImports(ctx: ClsContext, func: Func, paramsBeforeImports: Int) =
-        ctx.importGlobals.foldIndexed(func to ctx.importFuncs.size + paramsBeforeImports) {
-            importIndex, (func, importParamOffset), import ->
+        ctx.importGlobals.foldIndexed(func to ctx.importFuncs.size + paramsBeforeImports) { importIndex, (func, importParamOffset), import ->
             // Always a getter handle
             func.addInsns(
                 VarInsnNode(Opcodes.ALOAD, 0),
                 VarInsnNode(Opcodes.ALOAD, importParamOffset + 1),
-                FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName,
-                    ctx.importGlobalGetterFieldName(importIndex), MethodHandle::class.ref.asmDesc)
+                FieldInsnNode(
+                    Opcodes.PUTFIELD, ctx.thisRef.asmName,
+                    ctx.importGlobalGetterFieldName(importIndex), MethodHandle::class.ref.asmDesc
+                )
             ).let {
                 // If it's mutable, it has a second setter handle
                 if ((import.kind as? Node.Import.Kind.Global)?.type?.mutable == false) it to importParamOffset + 1
                 else it.addInsns(
                     VarInsnNode(Opcodes.ALOAD, 0),
                     VarInsnNode(Opcodes.ALOAD, importParamOffset + 2),
-                    FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName,
-                        ctx.importGlobalSetterFieldName(importIndex), MethodHandle::class.ref.asmDesc)
+                    FieldInsnNode(
+                        Opcodes.PUTFIELD, ctx.thisRef.asmName,
+                        ctx.importGlobalSetterFieldName(importIndex), MethodHandle::class.ref.asmDesc
+                    )
                 ) to importParamOffset + 2
             }
         }.first
@@ -280,8 +322,10 @@ open class AstToAsm {
             f.addInsns(
                 VarInsnNode(Opcodes.ALOAD, 0),
                 VarInsnNode(Opcodes.ALOAD, importIndex + paramsBeforeImports + 1),
-                FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName,
-                    ctx.funcName(importIndex), MethodHandle::class.ref.asmDesc)
+                FieldInsnNode(
+                    Opcodes.PUTFIELD, ctx.thisRef.asmName,
+                    ctx.funcName(importIndex), MethodHandle::class.ref.asmDesc
+                )
             )
         }
 
@@ -289,13 +333,15 @@ open class AstToAsm {
         if (ctx.mod.imports.none { it.kind is Node.Import.Kind.Table }) func else {
             val importIndex = ctx.importFuncs.size +
                 // Mutable global imports have setters and take up two spots
-                    ctx.importGlobals.sumOf { if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == true) 2L else 1L } +
+                ctx.importGlobals.sumOf { if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == true) 2L else 1L } +
                 paramsBeforeImports + 1
             func.addInsns(
                 VarInsnNode(Opcodes.ALOAD, 0),
                 VarInsnNode(Opcodes.ALOAD, importIndex.toInt()),
-                FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName,
-                    "table", Array<MethodHandle>::class.ref.asmDesc)
+                FieldInsnNode(
+                    Opcodes.PUTFIELD, ctx.thisRef.asmName,
+                    "table", Array<MethodHandle>::class.ref.asmDesc
+                )
             )
         }
 
@@ -303,67 +349,71 @@ open class AstToAsm {
         ctx.mod.globals.foldIndexed(func) { index, f, global ->
             // In the MVP, we can trust the init is constant stuff and a single instr
             if (global.init.size != 1) throw CompileErr.GlobalInitNotConstant(index)
-            f.addInsns(VarInsnNode(Opcodes.ALOAD, 0)).
-                addInsns(
-                    global.init.firstOrNull().let { instr ->
-                        when (instr) {
-                            is Node.Instr.Args.Const<*> -> {
-                                if (instr.value::class.javaPrimitiveType?.ref != global.type.contentType.typeRef)
-                                    throw CompileErr.GlobalConstantMismatch(
-                                        index,
-                                        global.type.contentType.typeRef,
-                                        instr.value::class.ref
-                                    )
-                                listOf(LdcInsnNode(instr.value))
-                            }
-                            // Initialize from an import global means we'll just grab the MH as from the param and call
-                            is Node.Instr.GetGlobal -> {
-                                when (val refGlobal = ctx.globalAtIndex(instr.index)) {
-                                    is Either.Right -> throw CompileErr.UnknownGlobal(instr.index)
-                                    is Either.Left -> (refGlobal.v.kind as Node.Import.Kind.Global).let { refGlobalKind ->
-                                        if (refGlobalKind.type.contentType != global.type.contentType)
-                                            throw CompileErr.GlobalConstantMismatch(
-                                                index,
-                                                global.type.contentType.typeRef,
-                                                refGlobalKind.type.contentType.typeRef
-                                            )
-                                        val paramOffset = ctx.importFuncs.size + paramsBeforeImports + 1 +
-                                                ctx.importGlobals.take(instr.index).sumOf {
-                                                    // Immutable jumps 1, mutable jumps 2
-                                                    if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == false) 1L
-                                                    else 2L
-                                                }
-                                        listOf(
-                                            VarInsnNode(Opcodes.ALOAD, paramOffset.toInt()),
-                                            MethodInsnNode(
-                                                Opcodes.INVOKEVIRTUAL,
-                                                MethodHandle::class.ref.asmName,
-                                                "invokeExact",
-                                                "()" + refGlobalKind.type.contentType.typeRef.asmDesc,
-                                                false
-                                            )
+            f.addInsns(VarInsnNode(Opcodes.ALOAD, 0)).addInsns(
+                global.init.firstOrNull().let { instr ->
+                    when (instr) {
+                        is Node.Instr.Args.Const<*> -> {
+                            if (instr.value::class.javaPrimitiveType?.ref != global.type.contentType.typeRef)
+                                throw CompileErr.GlobalConstantMismatch(
+                                    index,
+                                    global.type.contentType.typeRef,
+                                    instr.value::class.ref
+                                )
+                            listOf(LdcInsnNode(instr.value))
+                        }
+                        // Initialize from an import global means we'll just grab the MH as from the param and call
+                        is Node.Instr.GetGlobal -> {
+                            when (val refGlobal = ctx.globalAtIndex(instr.index)) {
+                                is Either.Right -> throw CompileErr.UnknownGlobal(instr.index)
+                                is Either.Left -> (refGlobal.v.kind as Node.Import.Kind.Global).let { refGlobalKind ->
+                                    if (refGlobalKind.type.contentType != global.type.contentType)
+                                        throw CompileErr.GlobalConstantMismatch(
+                                            index,
+                                            global.type.contentType.typeRef,
+                                            refGlobalKind.type.contentType.typeRef
                                         )
-                                    }
+                                    val paramOffset = ctx.importFuncs.size + paramsBeforeImports + 1 +
+                                        ctx.importGlobals.take(instr.index).sumOf {
+                                            // Immutable jumps 1, mutable jumps 2
+                                            if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == false) 1L
+                                            else 2L
+                                        }
+                                    listOf(
+                                        VarInsnNode(Opcodes.ALOAD, paramOffset.toInt()),
+                                        MethodInsnNode(
+                                            Opcodes.INVOKEVIRTUAL,
+                                            MethodHandle::class.ref.asmName,
+                                            "invokeExact",
+                                            "()" + refGlobalKind.type.contentType.typeRef.asmDesc,
+                                            false
+                                        )
+                                    )
                                 }
                             }
-                            // Otherwise, global constant
-                            null -> listOf(when (global.type.contentType) {
+                        }
+                        // Otherwise, global constant
+                        null -> listOf(
+                            when (global.type.contentType) {
                                 is Node.Type.Value.I32 -> 0.const
                                 is Node.Type.Value.I64 -> 0L.const
                                 is Node.Type.Value.F32 -> 0F.const
                                 is Node.Type.Value.F64 -> 0.0.const
-                            })
-                            else -> throw CompileErr.GlobalInitNotConstant(index)
-                        }
+                            }
+                        )
+                        else -> throw CompileErr.GlobalInitNotConstant(index)
                     }
-                ).addInsns(
-                FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName,
-                    ctx.globalName(ctx.importGlobals.size + index), global.type.contentType.typeRef.asmDesc)
+                }
+            ).addInsns(
+                FieldInsnNode(
+                    Opcodes.PUTFIELD, ctx.thisRef.asmName,
+                    ctx.globalName(ctx.importGlobals.size + index), global.type.contentType.typeRef.asmDesc
+                )
             )
         }
 
     private fun initializeConstructorTables(ctx: ClsContext, func: Func, paramsBeforeImports: Int): Func {
-        val table = ctx.mod.tables.singleOrNull() ?: ctx.mod.imports.firstNotNullOfOrNull { it.kind as? Node.Import.Kind.Table }?.type
+        val table = ctx.mod.tables.singleOrNull()
+            ?: ctx.mod.imports.firstNotNullOfOrNull { it.kind as? Node.Import.Kind.Table }?.type
         if (table == null) {
             if (ctx.mod.elems.isNotEmpty()) throw CompileErr.UnknownTable(0)
             return func
@@ -376,11 +426,13 @@ open class AstToAsm {
                 VarInsnNode(Opcodes.ALOAD, 0),
                 table.limits.initial.const,
                 TypeInsnNode(Opcodes.ANEWARRAY, MethodHandle::class.ref.asmName)
-            ).let { addElemsToTable(ctx, it, paramsBeforeImports) }.
+            ).let { addElemsToTable(ctx, it, paramsBeforeImports) }
                 // Put it on the field (we know that we have this + arr on the stack)
-                addInsns(
-                    FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName, "table",
-                        Array<MethodHandle>::class.ref.asmDesc)
+                .addInsns(
+                    FieldInsnNode(
+                        Opcodes.PUTFIELD, ctx.thisRef.asmName, "table",
+                        Array<MethodHandle>::class.ref.asmDesc
+                    )
                 )
         }
         // Otherwise, it was imported and we can set the elems on the imported one
@@ -390,9 +442,13 @@ open class AstToAsm {
             // Immutable is 1, mutable is 2
             if ((it.kind as? Node.Import.Kind.Global)?.type?.mutable == false) 1L else 2L
         } + paramsBeforeImports + 1
-        return addElemsToTable(ctx, func.addInsns(VarInsnNode(Opcodes.ALOAD, importIndex.toInt())), paramsBeforeImports).
+        return addElemsToTable(
+            ctx,
+            func.addInsns(VarInsnNode(Opcodes.ALOAD, importIndex.toInt())),
+            paramsBeforeImports
+        )
             // Remove the array that's still there
-            addInsns(InsnNode(Opcodes.POP))
+            .addInsns(InsnNode(Opcodes.POP))
     }
 
     // Can trust the array is on the stack and should leave it back on the stack
@@ -412,41 +468,42 @@ open class AstToAsm {
             // Could be a perf improvement here by resolving the offset before running each thing here
             elem.funcIndices.foldIndexed(f) { offsetIndex, ff, funcIndex ->
                 // Dup the array
-                ff.addInsns(InsnNode(Opcodes.DUP)).
+                ff.addInsns(InsnNode(Opcodes.DUP))
                     // Load the initial offset
-                    let { applyOffsetExpr(ctx, elem.offset, it) }.
-                    popExpecting(Int::class.ref).
+                    .let { applyOffsetExpr(ctx, elem.offset, it) }.popExpecting(Int::class.ref)
                     // Add to the offset
-                    addInsns(
+                    .addInsns(
                         offsetIndex.const,
                         InsnNode(Opcodes.IADD)
                     ).addInsns(
-                    // Load the proper method handle based on whether it's an import or not
-                    ctx.funcAtIndex(funcIndex).let { funcRef ->
-                        // TODO: validate func type
-                        val funcType = ctx.funcTypeAtIndex(funcIndex)
-                        when (funcRef) {
-                            is Either.Left ->
-                                // Imports we can just get from the param
-                                listOf(VarInsnNode(
-                                    Opcodes.ALOAD,
-                                    funcIndex + paramsBeforeImports + 1
-                                ))
-                            is Either.Right -> {
-                                listOf(
-                                    MethodHandles::lookup.invokeStatic(),
-                                    VarInsnNode(Opcodes.ALOAD, 0),
-                                    ctx.funcName(funcIndex).const,
-                                    // Method type const, yay
-                                    LdcInsnNode(Type.getMethodType(funcType.asmDesc)),
-                                    MethodHandles.Lookup::bind.invokeVirtual()
-                                )
+                        // Load the proper method handle based on whether it's an import or not
+                        ctx.funcAtIndex(funcIndex).let { funcRef ->
+                            // TODO: validate func type
+                            val funcType = ctx.funcTypeAtIndex(funcIndex)
+                            when (funcRef) {
+                                is Either.Left ->
+                                    // Imports we can just get from the param
+                                    listOf(
+                                        VarInsnNode(
+                                            Opcodes.ALOAD,
+                                            funcIndex + paramsBeforeImports + 1
+                                        )
+                                    )
+                                is Either.Right -> {
+                                    listOf(
+                                        MethodHandles::lookup.invokeStatic(),
+                                        VarInsnNode(Opcodes.ALOAD, 0),
+                                        ctx.funcName(funcIndex).const,
+                                        // Method type const, yay
+                                        LdcInsnNode(Type.getMethodType(funcType.asmDesc)),
+                                        MethodHandles.Lookup::bind.invokeVirtual()
+                                    )
+                                }
                             }
                         }
-                    }
-                ).addInsns(
-                    InsnNode(Opcodes.AASTORE)
-                )
+                    ).addInsns(
+                        InsnNode(Opcodes.AASTORE)
+                    )
             }
         }
 
@@ -460,15 +517,19 @@ open class AstToAsm {
                     // This is an import, so we can just access it as a param
                     func.addInsns(
                         VarInsnNode(Opcodes.ALOAD, ctx.mod.startFuncIndex + paramsBeforeImports + 1),
-                        MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName,
-                            "invokeExact", funcType.asmDesc, false)
+                        MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName,
+                            "invokeExact", funcType.asmDesc, false
+                        )
                     )
                 is Either.Right ->
                     // This is a local func, so invoke it virtual
                     func.addInsns(
                         VarInsnNode(Opcodes.ALOAD, 0),
-                        MethodInsnNode(Opcodes.INVOKEVIRTUAL, ctx.thisRef.asmName,
-                            ctx.funcName(ctx.mod.startFuncIndex), funcType.asmDesc, false)
+                        MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL, ctx.thisRef.asmName,
+                            ctx.funcName(ctx.mod.startFuncIndex), funcType.asmDesc, false
+                        )
                     )
             }
         }
@@ -532,28 +593,44 @@ open class AstToAsm {
             when (func) {
                 is Either.Left -> {
                     // Prepend this.funcName field ref and append invokeExact
-                    method.instructions.insert(FieldInsnNode(Opcodes.GETFIELD, ctx.thisRef.asmName,
-                        ctx.funcName(export.index), MethodHandle::class.ref.asmDesc))
+                    method.instructions.insert(
+                        FieldInsnNode(
+                            Opcodes.GETFIELD, ctx.thisRef.asmName,
+                            ctx.funcName(export.index), MethodHandle::class.ref.asmDesc
+                        )
+                    )
                     method.instructions.insert(VarInsnNode(Opcodes.ALOAD, 0))
-                    method.instructions.add(MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName,
-                        "invokeExact", funcType.asmDesc, false))
+                    method.instructions.add(
+                        MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName,
+                            "invokeExact", funcType.asmDesc, false
+                        )
+                    )
                 }
                 is Either.Right -> {
                     // Just prepend "this", and make call
                     method.instructions.insert(VarInsnNode(Opcodes.ALOAD, 0))
-                    method.instructions.add(MethodInsnNode(Opcodes.INVOKEVIRTUAL, ctx.thisRef.asmName,
-                        ctx.funcName(export.index), funcType.asmDesc, false))
+                    method.instructions.add(
+                        MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL, ctx.thisRef.asmName,
+                            ctx.funcName(export.index), funcType.asmDesc, false
+                        )
+                    )
                 }
             }
         }
         // Return as necessary
-        method.addInsns(InsnNode(when (funcType.ret) {
-            null -> Opcodes.RETURN
-            Node.Type.Value.I32 -> Opcodes.IRETURN
-            Node.Type.Value.I64 -> Opcodes.LRETURN
-            Node.Type.Value.F32 -> Opcodes.FRETURN
-            Node.Type.Value.F64 -> Opcodes.DRETURN
-        }))
+        method.addInsns(
+            InsnNode(
+                when (funcType.ret) {
+                    null -> Opcodes.RETURN
+                    Node.Type.Value.I32 -> Opcodes.IRETURN
+                    Node.Type.Value.I64 -> Opcodes.LRETURN
+                    Node.Type.Value.F32 -> Opcodes.FRETURN
+                    Node.Type.Value.F64 -> Opcodes.DRETURN
+                }
+            )
+        )
         method.visibleAnnotations = listOf(exportAnnotation(export))
         ctx.cls.methods.plusAssign(method)
     }
@@ -565,60 +642,88 @@ open class AstToAsm {
             is Either.Right -> global.v.type
         }
         // Create a simple getter
-        val getter = MethodNode(Opcodes.ACC_PUBLIC, "get" + export.field.javaIdent.replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(
-                Locale.getDefault()
-            ) else it.toString()
-        },
-            "()" + type.contentType.typeRef.asmDesc, null, null)
-        getter.addInsns(VarInsnNode(Opcodes.ALOAD, 0))
-        if (global is Either.Left) getter.addInsns(
-            FieldInsnNode(Opcodes.GETFIELD, ctx.thisRef.asmName,
-                ctx.importGlobalGetterFieldName(export.index), MethodHandle::class.ref.asmDesc),
-            MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
-                "()" + type.contentType.typeRef.asmDesc, false)
-        ) else getter.addInsns(
-            FieldInsnNode(Opcodes.GETFIELD, ctx.thisRef.asmName, ctx.globalName(export.index),
-                type.contentType.typeRef.asmDesc)
-        )
-        getter.addInsns(InsnNode(when (type.contentType) {
-            Node.Type.Value.I32 -> Opcodes.IRETURN
-            Node.Type.Value.I64 -> Opcodes.LRETURN
-            Node.Type.Value.F32 -> Opcodes.FRETURN
-            Node.Type.Value.F64 -> Opcodes.DRETURN
-        }))
-        getter.visibleAnnotations = listOf(exportAnnotation(export))
-        ctx.cls.methods.plusAssign(getter)
-        // If mutable, create simple setter
-        if (type.mutable) {
-            val setter = MethodNode(Opcodes.ACC_PUBLIC, "set" + export.field.javaIdent.replaceFirstChar {
+        val getter = MethodNode(
+            Opcodes.ACC_PUBLIC,
+            "get" + export.field.javaIdent.replaceFirstChar {
                 if (it.isLowerCase()) it.titlecase(
                     Locale.getDefault()
                 ) else it.toString()
             },
-                "(${type.contentType.typeRef.asmDesc})V", null, null)
+            "()" + type.contentType.typeRef.asmDesc, null, null
+        )
+        getter.addInsns(VarInsnNode(Opcodes.ALOAD, 0))
+        if (global is Either.Left) getter.addInsns(
+            FieldInsnNode(
+                Opcodes.GETFIELD, ctx.thisRef.asmName,
+                ctx.importGlobalGetterFieldName(export.index), MethodHandle::class.ref.asmDesc
+            ),
+            MethodInsnNode(
+                Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
+                "()" + type.contentType.typeRef.asmDesc, false
+            )
+        ) else getter.addInsns(
+            FieldInsnNode(
+                Opcodes.GETFIELD, ctx.thisRef.asmName, ctx.globalName(export.index),
+                type.contentType.typeRef.asmDesc
+            )
+        )
+        getter.addInsns(
+            InsnNode(
+                when (type.contentType) {
+                    Node.Type.Value.I32 -> Opcodes.IRETURN
+                    Node.Type.Value.I64 -> Opcodes.LRETURN
+                    Node.Type.Value.F32 -> Opcodes.FRETURN
+                    Node.Type.Value.F64 -> Opcodes.DRETURN
+                }
+            )
+        )
+        getter.visibleAnnotations = listOf(exportAnnotation(export))
+        ctx.cls.methods.plusAssign(getter)
+        // If mutable, create simple setter
+        if (type.mutable) {
+            val setter = MethodNode(
+                Opcodes.ACC_PUBLIC,
+                "set" + export.field.javaIdent.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(
+                        Locale.getDefault()
+                    ) else it.toString()
+                },
+                "(${type.contentType.typeRef.asmDesc})V", null, null
+            )
             setter.addInsns(VarInsnNode(Opcodes.ALOAD, 0))
             if (global is Either.Left) setter.addInsns(
-                FieldInsnNode(Opcodes.GETFIELD, ctx.thisRef.asmName,
-                    ctx.importGlobalSetterFieldName(export.index), MethodHandle::class.ref.asmDesc),
-                VarInsnNode(when (type.contentType) {
-                    Node.Type.Value.I32 -> Opcodes.ILOAD
-                    Node.Type.Value.I64 -> Opcodes.LLOAD
-                    Node.Type.Value.F32 -> Opcodes.FLOAD
-                    Node.Type.Value.F64 -> Opcodes.DLOAD
-                }, 1),
-                MethodInsnNode(Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
-                    "(${type.contentType.typeRef.asmDesc})V", false),
+                FieldInsnNode(
+                    Opcodes.GETFIELD, ctx.thisRef.asmName,
+                    ctx.importGlobalSetterFieldName(export.index), MethodHandle::class.ref.asmDesc
+                ),
+                VarInsnNode(
+                    when (type.contentType) {
+                        Node.Type.Value.I32 -> Opcodes.ILOAD
+                        Node.Type.Value.I64 -> Opcodes.LLOAD
+                        Node.Type.Value.F32 -> Opcodes.FLOAD
+                        Node.Type.Value.F64 -> Opcodes.DLOAD
+                    },
+                    1
+                ),
+                MethodInsnNode(
+                    Opcodes.INVOKEVIRTUAL, MethodHandle::class.ref.asmName, "invokeExact",
+                    "(${type.contentType.typeRef.asmDesc})V", false
+                ),
                 InsnNode(Opcodes.RETURN)
             ) else setter.addInsns(
-                VarInsnNode(when (type.contentType) {
-                    Node.Type.Value.I32 -> Opcodes.ILOAD
-                    Node.Type.Value.I64 -> Opcodes.LLOAD
-                    Node.Type.Value.F32 -> Opcodes.FLOAD
-                    Node.Type.Value.F64 -> Opcodes.DLOAD
-                }, 1),
-                FieldInsnNode(Opcodes.PUTFIELD, ctx.thisRef.asmName, ctx.globalName(export.index),
-                    type.contentType.typeRef.asmDesc),
+                VarInsnNode(
+                    when (type.contentType) {
+                        Node.Type.Value.I32 -> Opcodes.ILOAD
+                        Node.Type.Value.I64 -> Opcodes.LLOAD
+                        Node.Type.Value.F32 -> Opcodes.FLOAD
+                        Node.Type.Value.F64 -> Opcodes.DLOAD
+                    },
+                    1
+                ),
+                FieldInsnNode(
+                    Opcodes.PUTFIELD, ctx.thisRef.asmName, ctx.globalName(export.index),
+                    type.contentType.typeRef.asmDesc
+                ),
                 InsnNode(Opcodes.RETURN)
             )
             setter.visibleAnnotations = listOf(exportAnnotation(export))
@@ -629,12 +734,15 @@ open class AstToAsm {
     private fun addExportMemory(ctx: ClsContext, export: Node.Export) {
         // Create simple getter for the memory
         if (export.index != 0) throw CompileErr.UnknownMemory(export.index)
-        val method = MethodNode(Opcodes.ACC_PUBLIC, "get" + export.field.javaIdent.replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(
-                Locale.getDefault()
-            ) else it.toString()
-        },
-            "()" + ctx.mem.memType.asmDesc, null, null)
+        val method = MethodNode(
+            Opcodes.ACC_PUBLIC,
+            "get" + export.field.javaIdent.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                    Locale.getDefault()
+                ) else it.toString()
+            },
+            "()" + ctx.mem.memType.asmDesc, null, null
+        )
         method.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
             FieldInsnNode(Opcodes.GETFIELD, ctx.thisRef.asmName, "memory", ctx.mem.memType.asmDesc),
@@ -647,12 +755,15 @@ open class AstToAsm {
     private fun addExportTable(ctx: ClsContext, export: Node.Export) {
         // Create simple getter for the table
         if (export.index != 0) throw CompileErr.UnknownTable(export.index)
-        val method = MethodNode(Opcodes.ACC_PUBLIC, "get" + export.field.javaIdent.replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(
-                Locale.getDefault()
-            ) else it.toString()
-        },
-            "()" + Array<MethodHandle>::class.ref.asmDesc, null, null)
+        val method = MethodNode(
+            Opcodes.ACC_PUBLIC,
+            "get" + export.field.javaIdent.replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase(
+                    Locale.getDefault()
+                ) else it.toString()
+            },
+            "()" + Array<MethodHandle>::class.ref.asmDesc, null, null
+        )
         method.addInsns(
             VarInsnNode(Opcodes.ALOAD, 0),
             FieldInsnNode(Opcodes.GETFIELD, ctx.thisRef.asmName, "table", Array<MethodHandle>::class.ref.asmDesc),
@@ -663,9 +774,11 @@ open class AstToAsm {
     }
 
     private fun addFuncs(ctx: ClsContext) {
-        ctx.cls.methods.addAll(ctx.mod.funcs.mapIndexed { index, func ->
-            ctx.funcBuilder.fromFunc(ctx, func, ctx.importFuncs.size + index).toMethodNode()
-        })
+        ctx.cls.methods.addAll(
+            ctx.mod.funcs.mapIndexed { index, func ->
+                ctx.funcBuilder.fromFunc(ctx, func, ctx.importFuncs.size + index).toMethodNode()
+            }
+        )
     }
 
     fun addAnnotations(ctx: ClsContext) {
@@ -676,9 +789,14 @@ open class AstToAsm {
             // used to use this, but no longer does so it is opt-in for others to use. We choose to use an
             // annotation instead of an attribute for the same reasons Scala chose to make the switch in
             // 2.8+: Easier runtime reflection despite some size cost.
-            annotationVals.addAll(listOf("binary", ByteArrayOutputStream().also {
-                    ByteWriter.OutputStream(it).also { AstToBinary.fromModule(it, ctx.mod) }
-            }.toByteArray().toString(Charsets.ISO_8859_1)))
+            annotationVals.addAll(
+                listOf(
+                    "binary",
+                    ByteArrayOutputStream().also {
+                        ByteWriter.OutputStream(it).also { AstToBinary.fromModule(it, ctx.mod) }
+                    }.toByteArray().toString(Charsets.ISO_8859_1)
+                )
+            )
         }
         ctx.cls.visibleAnnotations = listOf(
             AnnotationNode(WasmModule::class.ref.asmDesc).also { it.values = annotationVals }

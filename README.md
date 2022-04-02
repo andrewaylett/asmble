@@ -1,7 +1,7 @@
 # Asmble
 
-Asmble is a compiler that compiles [WebAssembly](http://webassembly.org/) code to JVM bytecode. It also contains
-an interpreter and utilities for working with WASM code from the command line and from JVM languages.
+Asmble is a compiler that compiles [WebAssembly](http://webassembly.org/) code to JVM bytecode. It also contains an
+interpreter and utilities for working with WASM code from the command line and from JVM languages.
 
 ## Features
 
@@ -13,8 +13,8 @@ an interpreter and utilities for working with WASM code from the command line an
 
 ## Quick Start
 
-WebAssembly by itself does not have routines for printing to stdout or any external platform features. For this
-example we'll use the test harness used by the [spec](https://github.com/WebAssembly/spec/). Java 8 must be installed.
+WebAssembly by itself does not have routines for printing to stdout or any external platform features. For this example
+we'll use the test harness used by the [spec](https://github.com/WebAssembly/spec/). Java 8 must be installed.
 
 Download the latest TAR/ZIP from the [releases](https://github.com/cretz/asmble/releases) area and extract it to
 `asmble/`.
@@ -79,8 +79,8 @@ Running `asmble help compile`:
       <outClass> - The fully qualified class name. Required.
       -out <outFile> - The file name to output to. Can be '--' to write to stdout. Optional, default: <outClass.class>
 
-This is used to compile WebAssembly to a class file. See the [compilation details](#compilation-details) for details about how
-WebAssembly translates to JVM bytecode. The result will be a `.class` file containing JVM bytecode.
+This is used to compile WebAssembly to a class file. See the [compilation details](#compilation-details) for details
+about how WebAssembly translates to JVM bytecode. The result will be a `.class` file containing JVM bytecode.
 
 NOTE: There is no runtime required with the class files. They are self-contained.
 
@@ -256,8 +256,8 @@ set in the constructor.
 
 #### Imports
 
-The constructor accepts all imports as params. Memory is imported via a `ByteBuffer` param, then function
-imports as `MethodHandle` params, then global imports as `MethodHandle` params (one for getter and another for setter if
+The constructor accepts all imports as params. Memory is imported via a `ByteBuffer` param, then function imports
+as `MethodHandle` params, then global imports as `MethodHandle` params (one for getter and another for setter if
 mutable), then a `MethodHandle` array param for an imported table. All of these values are set as fields in the
 constructor.
 
@@ -359,14 +359,14 @@ Below are some performance and implementation quirks where there is a bit of an 
 and the JVM:
 
 * WebAssembly has a nice data section for byte arrays whereas the JVM does not. Right now we use a single-byte-char
-  string constant (i.e. ISO-8859 charset). This saves class file size, but this means we call `String::getBytes` on
-  init to load bytes from the string constant. Due to the JVM using an unsigned 16-bit int as the string constant
-  length, the maximum byte length is 65536. Since the string constants are stored as UTF-8 constants, they can be up to
-  four bytes a character. Therefore, we populate memory in data chunks no larger than 16300 (nice round number to make
-  sure that even in the worse case of 4 bytes per char in UTF-8 view, we're still under the max).
+  string constant (i.e. ISO-8859 charset). This saves class file size, but this means we call `String::getBytes` on init
+  to load bytes from the string constant. Due to the JVM using an unsigned 16-bit int as the string constant length, the
+  maximum byte length is 65536. Since the string constants are stored as UTF-8 constants, they can be up to four bytes a
+  character. Therefore, we populate memory in data chunks no larger than 16300 (nice round number to make sure that even
+  in the worse case of 4 bytes per char in UTF-8 view, we're still under the max).
 * The JVM makes no guarantees about trailing bits being preserved on NaN floating point representations like WebAssembly
-  does. This causes some mismatch on WebAssembly tests depending on how the JVM "feels" (I haven't dug into why some
-  bit patterns stay and some don't when NaNs are passed through methods).
+  does. This causes some mismatch on WebAssembly tests depending on how the JVM "feels" (I haven't dug into why some bit
+  patterns stay and some don't when NaNs are passed through methods).
 * The JVM requires strict stack management where the compiler writer is expected to pop off what he doesn't use before
   performing unconditional jumps. WebAssembly requires the runtime to discard unused stack items before unconditional
   jump so we have to handle this. This can cause performance issues because essentially we do a "pop-before-jump" which
@@ -389,10 +389,10 @@ and the JVM:
   more global set of runtime helpers, but we aim to be runtime free. Care was taken to allow the overflow checks to be
   turned off programmatically.
 * WebAssembly allows unsigned 32 bit int memory indices. `ByteBuffer` only has signed which means the value can
-  overflow. And in order to support even larger sets of memory, WebAssembly supports constant offsets which are added
-  to the runtime indices. Asmble will eagerly fail compilation if an offset is out of range. But at runtime we don't
-  check by default and the overflow can wrap around and access wrong memory. There is an option to do the overflow check
-  when added to the offset which is disabled by default. Other than this there is nothing we can do easily.
+  overflow. And in order to support even larger sets of memory, WebAssembly supports constant offsets which are added to
+  the runtime indices. Asmble will eagerly fail compilation if an offset is out of range. But at runtime we don't check
+  by default and the overflow can wrap around and access wrong memory. There is an option to do the overflow check when
+  added to the offset which is disabled by default. Other than this there is nothing we can do easily.
 
 ## FAQ
 

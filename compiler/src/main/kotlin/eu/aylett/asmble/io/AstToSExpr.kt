@@ -6,12 +6,12 @@ import eu.aylett.asmble.ast.Script
 
 open class AstToSExpr(val parensInstrs: Boolean = true) {
 
-    fun fromAction(v: Script.Cmd.Action) = when(v) {
+    fun fromAction(v: Script.Cmd.Action) = when (v) {
         is Script.Cmd.Action.Invoke -> newMulti("invoke", v.name) + v.string.quoted + v.exprs.flatMap(this::fromInstrs)
         is Script.Cmd.Action.Get -> newMulti("get", v.name) + v.string.quoted
     }
 
-    fun fromAssertion(v: Script.Cmd.Assertion) = when(v) {
+    fun fromAssertion(v: Script.Cmd.Assertion) = when (v) {
         is Script.Cmd.Assertion.Return ->
             newMulti("assert_return") + fromAction(v.action) + v.exprs.flatMap(this::fromInstrs)
         is Script.Cmd.Assertion.ReturnNan ->
@@ -35,7 +35,7 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
             newMulti("assert_exhaustion") + fromAction(v.action) + v.failure
     }
 
-    fun fromCmd(v: Script.Cmd): SExpr.Multi = when(v) {
+    fun fromCmd(v: Script.Cmd): SExpr.Multi = when (v) {
         is Script.Cmd.Module -> fromModule(v.module)
         is Script.Cmd.Register -> fromRegister(v)
         is Script.Cmd.Action -> fromAction(v)
@@ -44,18 +44,20 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
     }
 
     fun fromData(v: Node.Data) =
-        (newMulti("data") + v.index) + (newMulti("offset") +
-            fromInstrs(v.offset).unwrapInstrs()) + v.data.toString(Charsets.UTF_8).quoted
+        (newMulti("data") + v.index) + (
+            newMulti("offset") +
+                fromInstrs(v.offset).unwrapInstrs()
+            ) + v.data.toString(Charsets.UTF_8).quoted
 
     fun fromElem(v: Node.Elem) =
         (newMulti("elem") + v.index) + (newMulti("offset") + fromInstrs(v.offset).unwrapInstrs()) +
             v.funcIndices.map(this::fromNum)
 
-    fun fromElemType(v: Node.ElemType) = when(v) {
+    fun fromElemType(v: Node.ElemType) = when (v) {
         Node.ElemType.ANYFUNC -> fromString("anyfunc")
     }
 
-    fun fromExport(v: Node.Export) = newMulti("export") + v.field.quoted + when(v.kind) {
+    fun fromExport(v: Node.Export) = newMulti("export") + v.field.quoted + when (v.kind) {
         Node.ExternalKind.FUNCTION -> newMulti("func") + v.index
         Node.ExternalKind.TABLE -> newMulti("table") + v.index
         Node.ExternalKind.MEMORY -> newMulti("memory") + v.index
@@ -93,13 +95,14 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
 
     fun fromImportFunc(v: Node.Import.Kind.Func, types: List<Node.Type.Func>, name: String? = null) =
         fromImportFunc(types.getOrElse(v.typeIndex) { throw Exception("No type at ${v.typeIndex}") }, name)
+
     fun fromImportFunc(v: Node.Type.Func, name: String? = null) =
         newMulti("func", name) + fromFuncSig(v)
 
     fun fromImportGlobal(v: Node.Import.Kind.Global, name: String? = null) =
         newMulti("global", name) + fromGlobalSig(v.type)
 
-    fun fromImportKind(v: Node.Import.Kind, types: List<Node.Type.Func>, name: String? = null) = when(v) {
+    fun fromImportKind(v: Node.Import.Kind, types: List<Node.Type.Func>, name: String? = null) = when (v) {
         is Node.Import.Kind.Func -> fromImportFunc(v, types, name)
         is Node.Import.Kind.Table -> fromImportTable(v, name)
         is Node.Import.Kind.Memory -> fromImportMemory(v, name)
@@ -121,8 +124,8 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
         val exp = newMulti(it.name)
         when (it) {
             is Node.InstrOp.ControlFlowOp.NoArg, is Node.InstrOp.ParamOp.NoArg,
-                is Node.InstrOp.CompareOp.NoArg, is Node.InstrOp.NumOp.NoArg,
-                is Node.InstrOp.ConvertOp.NoArg, is Node.InstrOp.ReinterpretOp.NoArg -> exp
+            is Node.InstrOp.CompareOp.NoArg, is Node.InstrOp.NumOp.NoArg,
+            is Node.InstrOp.ConvertOp.NoArg, is Node.InstrOp.ReinterpretOp.NoArg -> exp
             is Node.InstrOp.ControlFlowOp.TypeArg -> exp + it.argsOf(v).type?.let(this::fromType)
             is Node.InstrOp.ControlFlowOp.DepthArg -> exp + it.argsOf(v).relativeDepth
             is Node.InstrOp.ControlFlowOp.TableArg -> it.argsOf(v).let {
@@ -132,8 +135,8 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
             is Node.InstrOp.CallOp.IndexReservedArg -> exp + it.argsOf(v).index
             is Node.InstrOp.VarOp.IndexArg -> exp + it.argsOf(v).index
             is Node.InstrOp.MemOp.AlignOffsetArg -> it.argsOf(v).let {
-                exp + it.offset.takeIf { it > 0 }?.let { "offset=$it"} +
-                    it.align.takeIf { it > 0 }?.let { "align=$it"}
+                exp + it.offset.takeIf { it > 0 }?.let { "offset=$it" } +
+                    it.align.takeIf { it > 0 }?.let { "align=$it" }
             }
             is Node.InstrOp.MemOp.ReservedArg -> exp
             is Node.InstrOp.ConstOp<*> -> exp + it.argsOf(v).value
@@ -179,7 +182,7 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
 
     fun fromMemorySig(v: Node.Type.Memory) = fromResizableLimits(v.limits)
 
-    fun fromMeta(v: Script.Cmd.Meta) = when(v) {
+    fun fromMeta(v: Script.Cmd.Meta) = when (v) {
         is Script.Cmd.Meta.Script -> newMulti("script", v.name) + fromScript(v.script)
         is Script.Cmd.Meta.Input -> newMulti("input", v.name) + v.str
         is Script.Cmd.Meta.Output -> newMulti("output", v.name) + v.str
@@ -240,28 +243,36 @@ open class AstToSExpr(val parensInstrs: Boolean = true) {
 
     fun fromTableSig(v: Node.Type.Table) = fromResizableLimits(v.limits) + fromElemType(v.elemType)
 
-    fun fromType(v: Node.Type.Value) = fromString(when (v) {
-        is Node.Type.Value.I32 -> "i32"
-        is Node.Type.Value.I64 -> "i64"
-        is Node.Type.Value.F32 -> "f32"
-        is Node.Type.Value.F64 -> "f64"
-    })
+    fun fromType(v: Node.Type.Value) = fromString(
+        when (v) {
+            is Node.Type.Value.I32 -> "i32"
+            is Node.Type.Value.I64 -> "i64"
+            is Node.Type.Value.F32 -> "f32"
+            is Node.Type.Value.F64 -> "f64"
+        }
+    )
 
     fun fromTypeDef(v: Node.Type.Func, name: String? = null) =
         newMulti("type", name) + (newMulti("func") + fromFuncSig(v))
 
     private operator fun SExpr.Multi.plus(exp: Number?) =
         if (exp == null) this else this.copy(vals = this.vals + fromNum(exp))
+
     private operator fun SExpr.Multi.plus(exp: String?) =
-            if (exp == null) this else this.copy(vals = this.vals + fromString(exp))
+        if (exp == null) this else this.copy(vals = this.vals + fromString(exp))
+
     private operator fun SExpr.Multi.plus(exp: SExpr?) =
         if (exp == null) this else this.copy(vals = this.vals + exp)
+
     private operator fun SExpr.Multi.plus(exps: List<SExpr>?) =
         if (exps == null || exps.isEmpty()) this else this.copy(vals = this.vals + exps)
+
     private fun newMulti(initSymb: String? = null, initName: String? = null) =
         SExpr.Multi() + initSymb + initName?.let { "$$it" }
+
     private fun List<SExpr.Multi>.unwrapInstrs() =
         if (parensInstrs) this else this.single().vals
+
     private val String.quoted get() = fromString(this, true)
 
     companion object : AstToSExpr()

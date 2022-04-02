@@ -2,7 +2,11 @@ package eu.aylett.asmble.compile.jvm
 
 import eu.aylett.asmble.ast.Node
 import org.objectweb.asm.Opcodes
-import org.objectweb.asm.tree.*
+import org.objectweb.asm.tree.AbstractInsnNode
+import org.objectweb.asm.tree.InsnNode
+import org.objectweb.asm.tree.JumpInsnNode
+import org.objectweb.asm.tree.LabelNode
+import org.objectweb.asm.tree.MethodNode
 
 data class Func(
     val name: String,
@@ -74,7 +78,7 @@ data class Func(
         return copy(stack = stack.dropLast(1)) to stack.last()
     }
 
-    fun peekExpecting(type: TypeRef, currBlock: Block = currentBlock): Unit {
+    fun peekExpecting(type: TypeRef, currBlock: Block = currentBlock) {
         // Just pop expecting
         popExpecting(type, currBlock)
     }
@@ -92,21 +96,23 @@ data class Func(
     fun stackSwap(currBlock: Block = currentBlock) =
         pop(currBlock).let { (fn, refLast) ->
             fn.pop(currBlock).let { (fn, refFirst) ->
-                (if (refFirst.stackSize == 2) {
-                    if (refLast.stackSize == 2)
+                (
+                    if (refFirst.stackSize == 2) {
+                        if (refLast.stackSize == 2)
                         // If they are both 2, dup2_x2 + pop2
-                        fn.addInsns(InsnNode(Opcodes.DUP2_X2), InsnNode(Opcodes.POP2))
-                    else
+                            fn.addInsns(InsnNode(Opcodes.DUP2_X2), InsnNode(Opcodes.POP2))
+                        else
                         // If only the first one is, dup_x2 + pop
-                        fn.addInsns(InsnNode(Opcodes.DUP_X2), InsnNode(Opcodes.POP))
-                } else {
-                    if (refLast.stackSize == 2)
-                       // If the first is not 2 but the last is, dup_2x1, pop2
-                        fn.addInsns(InsnNode(Opcodes.DUP2_X1), InsnNode(Opcodes.POP2))
-                    else
+                            fn.addInsns(InsnNode(Opcodes.DUP_X2), InsnNode(Opcodes.POP))
+                    } else {
+                        if (refLast.stackSize == 2)
+                        // If the first is not 2 but the last is, dup_2x1, pop2
+                            fn.addInsns(InsnNode(Opcodes.DUP2_X1), InsnNode(Opcodes.POP2))
+                        else
                         // If neither are 2, just swap
-                        fn.addInsns(InsnNode(Opcodes.SWAP))
-                }).push(refLast).push(refFirst)
+                            fn.addInsns(InsnNode(Opcodes.SWAP))
+                    }
+                    ).push(refLast).push(refFirst)
             }
         }
 
@@ -142,9 +148,10 @@ data class Func(
 
         var _label: LabelNode? = null
         val label get() = _label
-        val requiredLabel: LabelNode get() {
-            if (_label == null) _label = LabelNode()
-            return _label!!
-        }
+        val requiredLabel: LabelNode
+            get() {
+                if (_label == null) _label = LabelNode()
+                return _label!!
+            }
     }
 }

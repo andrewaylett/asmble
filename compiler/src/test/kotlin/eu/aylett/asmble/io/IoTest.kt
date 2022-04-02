@@ -4,7 +4,6 @@ import eu.aylett.asmble.SpecTestUnit
 import eu.aylett.asmble.TestBase
 import eu.aylett.asmble.ast.Node
 import eu.aylett.asmble.ast.Script
-import eu.aylett.asmble.util.Logger
 import org.junit.Assert.assertArrayEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,12 +18,15 @@ class IoTest(val unit: SpecTestUnit) : TestBase() {
     @Test
     fun testIo() {
         // Go from the AST to binary then back to AST then back to binary and confirm values are as expected
-        val ast1 = unit.script.commands.mapNotNull { (it as? Script.Cmd.Module)?.module?.also {
-            trace { "AST from script:\n" + SExprToStr.fromSExpr(AstToSExpr.fromModule(it)) }
-        } }
+        val ast1 = unit.script.commands.mapNotNull {
+            (it as? Script.Cmd.Module)?.module?.also {
+                trace { "AST from script:\n" + SExprToStr.fromSExpr(AstToSExpr.fromModule(it)) }
+            }
+        }
         val out = ByteArrayOutputStream()
         fun toBinary(mod: Node.Module) =
             AstToBinary.fromModule(ByteWriter.OutputStream(out.also { it.reset() }), mod).run { out.toByteArray() }
+
         val binaries1 = ast1.map(::toBinary)
         val ast2 = binaries1.map {
             trace { "Bytes for AST (${it.size}): ${it.asList()}" }
@@ -46,7 +48,8 @@ class IoTest(val unit: SpecTestUnit) : TestBase() {
 
     companion object {
         // Only tests that shouldn't fail
-        @JvmStatic @Parameterized.Parameters(name = "{0}")
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
         fun data() = SpecTestUnit.allUnits.filterNot { it.shouldFail }
     }
 }

@@ -6,7 +6,6 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 
-
 abstract class ByteReader {
     abstract val isEof: Boolean
 
@@ -16,21 +15,25 @@ abstract class ByteReader {
     abstract fun readBytes(amount: Int? = null): ByteArray
 
     fun readUInt32(): Long {
-        return ((readByte().toInt() and 0xff) or
-            ((readByte().toInt() and 0xff) shl 8) or
-            ((readByte().toInt() and 0xff) shl 16) or
-            ((readByte().toInt() and 0xff) shl 24)).toUnsignedLong()
+        return (
+            (readByte().toInt() and 0xff) or
+                ((readByte().toInt() and 0xff) shl 8) or
+                ((readByte().toInt() and 0xff) shl 16) or
+                ((readByte().toInt() and 0xff) shl 24)
+            ).toUnsignedLong()
     }
 
     fun readUInt64(): BigInteger {
-        return ((readByte().toLong() and 0xff) or
-            ((readByte().toLong() and 0xff) shl 8) or
-            ((readByte().toLong() and 0xff) shl 16) or
-            ((readByte().toLong() and 0xff) shl 24) or
-            ((readByte().toLong() and 0xff) shl 32) or
-            ((readByte().toLong() and 0xff) shl 40) or
-            ((readByte().toLong() and 0xff) shl 48) or
-            ((readByte().toLong() and 0xff) shl 56)).toUnsignedBigInt()
+        return (
+            (readByte().toLong() and 0xff) or
+                ((readByte().toLong() and 0xff) shl 8) or
+                ((readByte().toLong() and 0xff) shl 16) or
+                ((readByte().toLong() and 0xff) shl 24) or
+                ((readByte().toLong() and 0xff) shl 32) or
+                ((readByte().toLong() and 0xff) shl 40) or
+                ((readByte().toLong() and 0xff) shl 48) or
+                ((readByte().toLong() and 0xff) shl 56)
+            ).toUnsignedBigInt()
     }
 
     fun readVarInt7() = readSignedLeb128().let {
@@ -105,13 +108,14 @@ abstract class ByteReader {
     class InputStream(val ins: java.io.InputStream) : ByteReader() {
         private var nextByte: Byte? = null
         private var sawEof = false
-        override val isEof: Boolean get() {
-            if (!sawEof && nextByte == null) {
-                val b = ins.read()
-                if (b == -1) sawEof = true else nextByte = b.toByte()
+        override val isEof: Boolean
+            get() {
+                if (!sawEof && nextByte == null) {
+                    val b = ins.read()
+                    if (b == -1) sawEof = true else nextByte = b.toByte()
+                }
+                return sawEof && nextByte == null
             }
-            return sawEof && nextByte == null
-        }
 
         override fun read(amount: Int) = ByteReader.InputStream(ByteArrayInputStream(readBytes(amount)))
 

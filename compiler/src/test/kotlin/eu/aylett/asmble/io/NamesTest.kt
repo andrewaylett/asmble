@@ -8,7 +8,9 @@ class NamesTest {
     @Test
     fun testNames() {
         // First, make sure it can parse from sexpr
-        val (_, mod1) = SExprToAst.toModule(StrToSExpr.parseSingleMulti("""
+        val (_, mod1) = SExprToAst.toModule(
+            StrToSExpr.parseSingleMulti(
+                """
             (module ${'$'}mod_name
                 (import "foo" "bar" (func ${'$'}import_func (param i32)))
                 (type ${'$'}some_sig (func (param ${'$'}type_param i32)))
@@ -19,7 +21,9 @@ class NamesTest {
                     (local ${'$'}func_local1 f64)
                 )
             )
-        """.trimIndent()))
+                """.trimIndent()
+            )
+        )
         val expected = Node.NameSection(
             moduleName = "mod_name",
             funcNames = mapOf(

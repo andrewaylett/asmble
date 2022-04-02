@@ -21,7 +21,7 @@ public class RustLib implements RegexLib<RustLib.Ptr> {
     public RustPattern compile(String str) {
         return new RustPattern(str);
     }
-    
+
     @Override
     public Ptr prepareTarget(String target) {
         return ptrFromString(target);

@@ -8,7 +8,7 @@ import org.junit.Assert
 import org.junit.Test
 import org.objectweb.asm.MethodTooLargeException
 import java.nio.ByteBuffer
-import java.util.*
+import java.util.UUID
 import kotlin.test.assertEquals
 
 class LargeFuncTest : TestBase() {
@@ -22,20 +22,22 @@ class LargeFuncTest : TestBase() {
             logger = logger,
             mod = Node.Module(
                 memories = listOf(Node.Type.Memory(Node.ResizableLimits(initial = 4, maximum = 4))),
-                funcs = listOf(Node.Func(
-                    type = Node.Type.Func(params = emptyList(), ret = null),
-                    locals = emptyList(),
-                    instructions = (0 until numInsnChunks).flatMap {
-                        listOf<Node.Instr>(
-                            Node.Instr.I32Const(it * 4),
-                            // Let's to i * (i = 1)
-                            Node.Instr.I32Const(it),
-                            Node.Instr.I32Const(it - 1),
-                            Node.Instr.I32Mul,
-                            Node.Instr.I32Store(0, 0)
-                        )
-                    }
-                )),
+                funcs = listOf(
+                    Node.Func(
+                        type = Node.Type.Func(params = emptyList(), ret = null),
+                        locals = emptyList(),
+                        instructions = (0 until numInsnChunks).flatMap {
+                            listOf<Node.Instr>(
+                                Node.Instr.I32Const(it * 4),
+                                // Let's to i * (i = 1)
+                                Node.Instr.I32Const(it),
+                                Node.Instr.I32Const(it - 1),
+                                Node.Instr.I32Mul,
+                                Node.Instr.I32Store(0, 0)
+                            )
+                        }
+                    )
+                ),
                 names = Node.NameSection(
                     moduleName = null,
                     funcNames = mapOf(0 to "someFunc"),
@@ -51,10 +53,11 @@ class LargeFuncTest : TestBase() {
         AstToAsm.fromModule(ctx)
         // Confirm the method size is too large
         try {
-            ModuleBuilder.Compiled.SimpleClassLoader(javaClass.classLoader, logger, splitWhenTooLarge = false).
-                fromBuiltContext(ctx)
+            ModuleBuilder.Compiled.SimpleClassLoader(javaClass.classLoader, logger, splitWhenTooLarge = false)
+                .fromBuiltContext(ctx)
             Assert.fail()
-        } catch (_: MethodTooLargeException) { }
+        } catch (_: MethodTooLargeException) {
+        }
         // Try again with split
         val cls = ModuleBuilder.Compiled.SimpleClassLoader(javaClass.classLoader, logger).fromBuiltContext(ctx)
         // Create it and check that it still does what we expect

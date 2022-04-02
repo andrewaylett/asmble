@@ -1,9 +1,9 @@
 package eu.aylett.asmble.run.jvm
 
-import eu.aylett.asmble.AsmErr
 import eu.aylett.asmble.ast.Node
 
-sealed class RunErr(message: String, cause: Throwable? = null) : RuntimeException(message, cause),
+sealed class RunErr(message: String, cause: Throwable? = null) :
+    RuntimeException(message, cause),
     eu.aylett.asmble.AsmErr {
 
     class ImportMemoryLimitTooSmall(

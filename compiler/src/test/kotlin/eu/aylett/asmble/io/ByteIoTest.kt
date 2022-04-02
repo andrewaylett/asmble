@@ -21,7 +21,7 @@ class ByteIoTest {
     }
 
     fun testReaderWriter(reader: ByteReader, writer: ByteWriter) {
-        writer.writeByte( -0x10)
+        writer.writeByte(-0x10)
         writer.writeByte(0x10)
         assertEquals(-0x10, reader.readByte())
         assertEquals(0x10, reader.readByte())

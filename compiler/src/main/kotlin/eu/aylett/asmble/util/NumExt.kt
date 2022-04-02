@@ -1,6 +1,5 @@
 package eu.aylett.asmble.util
 
-import java.math.BigDecimal
 import java.math.BigInteger
 
 internal const val INT_MASK = 0xffffffffL

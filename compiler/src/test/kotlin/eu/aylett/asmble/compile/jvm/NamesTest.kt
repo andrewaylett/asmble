@@ -5,13 +5,15 @@ import eu.aylett.asmble.io.SExprToAst
 import eu.aylett.asmble.io.StrToSExpr
 import eu.aylett.asmble.run.jvm.ModuleBuilder
 import org.junit.Test
-import java.util.*
+import java.util.UUID
 
 class NamesTest : TestBase() {
     @Test
     fun testNames() {
         // Compile and make sure the names are set right
-        val (_, mod) = SExprToAst.toModule(StrToSExpr.parseSingleMulti("""
+        val (_, mod) = SExprToAst.toModule(
+            StrToSExpr.parseSingleMulti(
+                """
             (module ${'$'}mod_name
                 (import "foo" "bar" (func ${'$'}import_func (param i32)))
                 (type ${'$'}some_sig (func (param ${'$'}type_param i32)))
@@ -22,7 +24,9 @@ class NamesTest : TestBase() {
                     (local ${'$'}func_local1 f64)
                 )
             )
-        """.trimIndent()))
+                """.trimIndent()
+            )
+        )
         val ctx = ClsContext(
             packageName = "test",
             className = "Temp" + UUID.randomUUID().toString().replace("-", ""),

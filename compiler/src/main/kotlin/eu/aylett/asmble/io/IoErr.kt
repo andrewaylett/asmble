@@ -1,8 +1,7 @@
 package eu.aylett.asmble.io
 
-import eu.aylett.asmble.AsmErr
-
-sealed class IoErr(message: String, cause: Throwable? = null) : RuntimeException(message, cause),
+sealed class IoErr(message: String, cause: Throwable? = null) :
+    RuntimeException(message, cause),
     eu.aylett.asmble.AsmErr {
     class UnexpectedEnd : IoErr("Unexpected EOF") {
         override val asmErrString get() = "unexpected end"
@@ -19,6 +18,7 @@ sealed class IoErr(message: String, cause: Throwable? = null) : RuntimeException
 
     class InvalidSectionId(id: Int) : IoErr("Invalid section ID of $id") {
         override val asmErrString get() = "invalid section id"
+
         // Since we test section length before section content, we get a different error than the spec
         override val asmErrStrings get() = listOf(asmErrString, "invalid mutability")
     }
@@ -72,7 +72,7 @@ sealed class IoErr(message: String, cause: Throwable? = null) : RuntimeException
     }
 
     class MismatchLabelEnd(val expected: String?, val actual: String) :
-            IoErr("Expected end for $expected, got $actual") {
+        IoErr("Expected end for $expected, got $actual") {
         override val asmErrString get() = "mismatching label"
     }
 

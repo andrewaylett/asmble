@@ -10,10 +10,11 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 class InterpretTest(unit: SpecTestUnit) : TestRunner<SpecTestUnit>(unit) {
 
-    override val builder get() = RunModule.Builder(
-        logger = logger,
-        defaultMaxMemPages = unit.defaultMaxMemPages
-    )
+    override val builder
+        get() = RunModule.Builder(
+            logger = logger,
+            defaultMaxMemPages = unit.defaultMaxMemPages
+        )
 
     // Some things require compilation of code, something the interpreter doesn't do until execution time
     override fun warningInsteadOfErrReason(t: Throwable) = super.warningInsteadOfErrReason(t) ?: run {
@@ -24,8 +25,8 @@ class InterpretTest(unit: SpecTestUnit) : TestRunner<SpecTestUnit>(unit) {
         when (unit.name) {
             "if" -> {
                 // Couple of tests expect mismatching label to be caught at compilation without execution
-                val compileErr = ((t as? ScriptAssertionError)?.
-                    assertion as? Script.Cmd.Assertion.Malformed)?.failure == "mismatching label"
+                val compileErr =
+                    ((t as? ScriptAssertionError)?.assertion as? Script.Cmd.Assertion.Malformed)?.failure == "mismatching label"
                 if (compileErr) "Interpreter doesn't check unexecuted code" else null
             }
             "imports", "linking" -> (t as? ScriptAssertionError)?.assertion?.let { assertion ->
@@ -54,7 +55,8 @@ class InterpretTest(unit: SpecTestUnit) : TestRunner<SpecTestUnit>(unit) {
     }
 
     companion object {
-        @JvmStatic @Parameterized.Parameters(name = "{0}")
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
         fun data() = SpecTestUnit.allUnits
     }
 }

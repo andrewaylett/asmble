@@ -1,7 +1,11 @@
 package eu.aylett.asmble.run.jvm
 
 import eu.aylett.asmble.ast.Node
-import eu.aylett.asmble.compile.jvm.*
+import eu.aylett.asmble.compile.jvm.AsmToBinary
+import eu.aylett.asmble.compile.jvm.AstToAsm
+import eu.aylett.asmble.compile.jvm.ClsContext
+import eu.aylett.asmble.compile.jvm.asClassNode
+import eu.aylett.asmble.compile.jvm.toAsmString
 import eu.aylett.asmble.util.Logger
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
@@ -46,18 +50,21 @@ interface ModuleBuilder<T : Module> {
                 return writer.fromClassNode(ctx.cls).let { bytes ->
                     debug { "ASM class:\n" + bytes.asClassNode().toAsmString() }
                     val prefix = if (ctx.packageName.isNotEmpty()) ctx.packageName + "." else ""
-                    defineClass("$prefix${ctx.className}",  bytes, 0, bytes.size)
+                    defineClass("$prefix${ctx.className}", bytes, 0, bytes.size)
                 }
             }
 
             fun addClass(bytes: ByteArray) {
                 // Just get the name
                 var className = ""
-                ClassReader(bytes).accept(object : ClassVisitor(Opcodes.ASM5) {
-                    override fun visit(a: Int, b: Int, name: String, c: String?, d: String?, e: Array<out String>?) {
-                        className = name.replace('/', '.')
-                    }
-                }, ClassReader.SKIP_CODE)
+                ClassReader(bytes).accept(
+                    object : ClassVisitor(Opcodes.ASM5) {
+                        override fun visit(a: Int, b: Int, name: String, c: String?, d: String?, e: Array<out String>?) {
+                            className = name.replace('/', '.')
+                        }
+                    },
+                    ClassReader.SKIP_CODE
+                )
                 defineClass(className, bytes, 0, bytes.size)
             }
         }

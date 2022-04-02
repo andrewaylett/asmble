@@ -6,7 +6,7 @@ import eu.aylett.asmble.compile.jvm.AstToAsm
 import eu.aylett.asmble.compile.jvm.ClsContext
 import eu.aylett.asmble.io.BinaryToAst
 import org.junit.Test
-import java.util.*
+import java.util.UUID
 
 class LargeInitFuncTest : TestBase() {
     // This used to fail because large <init> methods didn't properly split

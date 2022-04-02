@@ -17,8 +17,10 @@ class StackTest(val unit: SpecTestUnit) : TestBase() {
                 debug { "Func: ${func.type}" }
                 var indexCount = 0
                 Stack.walkStrict(mod.module, func) { stack, insn ->
-                    debug { "  After $insn (next: ${func.instructions.getOrNull(++indexCount)}, " +
-                        "unreach depth: ${stack.unreachableUntilNextEndCount})" }
+                    debug {
+                        "  After $insn (next: ${func.instructions.getOrNull(++indexCount)}, " +
+                            "unreach depth: ${stack.unreachableUntilNextEndCount})"
+                    }
                     debug { "    " + stack.current }
                 }
             }
@@ -27,7 +29,8 @@ class StackTest(val unit: SpecTestUnit) : TestBase() {
 
     companion object {
         // Only tests that shouldn't fail
-        @JvmStatic @Parameterized.Parameters(name = "{0}")
-        fun data() = SpecTestUnit.allUnits.filterNot { it.shouldFail }//.filter { it.name == "loop" }
+        @JvmStatic
+        @Parameterized.Parameters(name = "{0}")
+        fun data() = SpecTestUnit.allUnits.filterNot { it.shouldFail } // .filter { it.name == "loop" }
     }
 }

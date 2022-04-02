@@ -1,7 +1,7 @@
 package eu.aylett.asmble.cli
 
 import eu.aylett.asmble.util.Logger
-import java.util.*
+import java.util.Locale
 import kotlin.system.exitProcess
 
 val commands = listOf(Compile, Help, Invoke, Link, Run, Translate)
@@ -32,7 +32,7 @@ fun main(args: Array<String>) {
         command.runWithArgs(argBuild)
     } catch (e: Exception) {
         logger.error { "Error ${command?.let { "in command '${it.name}'" } ?: ""}: ${e.message}" }
-        if (logger.level > Logger.Level.INFO ) logger.error { "Use '-log info' for more details." }
+        if (logger.level > Logger.Level.INFO) logger.error { "Use '-log info' for more details." }
         else e.printStackTrace()
         exitProcess(1)
     }

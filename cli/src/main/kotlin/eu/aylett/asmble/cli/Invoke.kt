@@ -38,13 +38,13 @@ open class Invoke : ScriptCommand<Invoke.Args>() {
         // Instantiate the module
         val module =
             if (args.module == "<last-in-entry>") ctx.modules.lastOrNull() ?: error("No modules available")
-            else ctx.registrations[args.module] as? Module.Instance ?:
-                error("Unable to find module registered as ${args.module}")
+            else ctx.registrations[args.module] as? Module.Instance
+                ?: error("Unable to find module registered as ${args.module}")
         module as Module.Compiled
         // If an export is provided, call it
         if (args.export != "<start-func>") args.export.javaIdent.let { javaName ->
-            val method = module.cls.declaredMethods.find { it.name == javaName } ?:
-                error("Unable to find export '${args.export}'")
+            val method = module.cls.declaredMethods.find { it.name == javaName }
+                ?: error("Unable to find export '${args.export}'")
             // Map args to params
             require(method.parameterTypes.size == args.args.size) {
                 "Given arg count of ${args.args.size} is invalid for $method"

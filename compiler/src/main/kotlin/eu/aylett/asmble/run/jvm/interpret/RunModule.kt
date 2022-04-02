@@ -19,16 +19,28 @@ class RunModule(
     override fun exportedGlobal(field: String) = ctx.exportIndex(field, Node.ExternalKind.GLOBAL)?.let { index ->
         val type = ctx.globalTypeAtIndex(index)
         val lookup = MethodHandles.lookup()
-        var getter = lookup.bind(ctx, "getGlobal",
-            MethodType.methodType(Number::class.java, Int::class.javaPrimitiveType))
-        var setter = if (!type.mutable) null else lookup.bind(ctx, "setGlobal", MethodType.methodType(
-            Void::class.javaPrimitiveType, Int::class.javaPrimitiveType, Number::class.java))
+        var getter = lookup.bind(
+            ctx, "getGlobal",
+            MethodType.methodType(Number::class.java, Int::class.javaPrimitiveType)
+        )
+        var setter = if (!type.mutable) null else lookup.bind(
+            ctx, "setGlobal",
+            MethodType.methodType(
+                Void::class.javaPrimitiveType, Int::class.javaPrimitiveType, Number::class.java
+            )
+        )
         // Cast number to specific type
-        getter = MethodHandles.explicitCastArguments(getter,
-            MethodType.methodType(type.contentType.jclass, Int::class.javaPrimitiveType))
+        getter = MethodHandles.explicitCastArguments(
+            getter,
+            MethodType.methodType(type.contentType.jclass, Int::class.javaPrimitiveType)
+        )
         if (setter != null)
-            setter = MethodHandles.explicitCastArguments(setter, MethodType.methodType(
-                Void::class.javaPrimitiveType, Int::class.javaPrimitiveType, type.contentType.jclass))
+            setter = MethodHandles.explicitCastArguments(
+                setter,
+                MethodType.methodType(
+                    Void::class.javaPrimitiveType, Int::class.javaPrimitiveType, type.contentType.jclass
+                )
+            )
         // Insert the index argument up front
         getter = MethodHandles.insertArguments(getter, 0, index)
         if (setter != null) setter = MethodHandles.insertArguments(setter, 0, index)

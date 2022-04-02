@@ -60,7 +60,9 @@ abstract class Command<T> {
                 lowPriority: Boolean
             ): List<String> {
                 var ret = emptyList<String>()
-                while (true) { ret += getArg(opt) ?: break }
+                while (true) {
+                    ret += getArg(opt) ?: break
+                }
                 return if (ret.isNotEmpty()) ret else default ?: error("Arg '$name' not found")
             }
 
@@ -118,11 +120,12 @@ abstract class Command<T> {
                 return false
             }
 
-            override fun done() { }
+            override fun done() {}
         }
 
         sealed class ArgDef : Comparable<ArgDef> {
             abstract val name: String
+
             // True means it won't appear in the single-line desc
             abstract val lowPriority: Boolean
             abstract fun argString(bld: StringBuilder): StringBuilder

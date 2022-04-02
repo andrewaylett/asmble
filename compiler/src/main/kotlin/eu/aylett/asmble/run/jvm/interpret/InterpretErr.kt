@@ -1,9 +1,9 @@
 package eu.aylett.asmble.run.jvm.interpret
 
-import eu.aylett.asmble.AsmErr
 import eu.aylett.asmble.ast.Node
 
-sealed class InterpretErr(message: String, cause: Throwable? = null) : RuntimeException(message, cause),
+sealed class InterpretErr(message: String, cause: Throwable? = null) :
+    RuntimeException(message, cause),
     eu.aylett.asmble.AsmErr {
 
     class IndirectCallTypeMismatch(

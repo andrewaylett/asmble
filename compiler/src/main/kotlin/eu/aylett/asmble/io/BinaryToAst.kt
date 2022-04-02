@@ -1,8 +1,13 @@
 package eu.aylett.asmble.io
 
 import eu.aylett.asmble.ast.Node
-import eu.aylett.asmble.util.*
-import java.io.ByteArrayInputStream
+import eu.aylett.asmble.util.Logger
+import eu.aylett.asmble.util.fromIntBits
+import eu.aylett.asmble.util.fromLongBits
+import eu.aylett.asmble.util.toIntExact
+import eu.aylett.asmble.util.toUnsignedShort
+import eu.aylett.asmble.util.unsignedToSignedInt
+import eu.aylett.asmble.util.unsignedToSignedLong
 import java.nio.ByteBuffer
 
 open class BinaryToAst(
@@ -29,6 +34,7 @@ open class BinaryToAst(
             b.readList { it.readVarUInt32AsInt() to fn(it) }.let { pairs ->
                 pairs.toMap().also { require(it.size == pairs.size) { "Malformed names: duplicate indices" } }
             }
+
         fun nameMap(b: ByteReader) = indexMap(b) { it.readString() }
         when (type) {
             0 -> sect.copy(moduleName = b.readString())
@@ -95,7 +101,11 @@ open class BinaryToAst(
 
     fun toGlobalType(b: ByteReader) = Node.Type.Global(
         contentType = toValueType(b),
-        mutable = try { b.readVarUInt1() } catch (_: Exception) { throw IoErr.InvalidMutability() }
+        mutable = try {
+            b.readVarUInt1()
+        } catch (_: Exception) {
+            throw IoErr.InvalidMutability()
+        }
     )
 
     fun toImport(b: ByteReader) = Node.Import(
@@ -164,7 +174,11 @@ open class BinaryToAst(
     }
 
     fun toLocals(b: ByteReader): List<Node.Type.Value> {
-        val size = try { b.readVarUInt32AsInt() } catch (e: NumberFormatException) { throw IoErr.InvalidLocalSize(e) }
+        val size = try {
+            b.readVarUInt32AsInt()
+        } catch (e: NumberFormatException) {
+            throw IoErr.InvalidLocalSize(e)
+        }
         return toValueType(b).let { type -> List(size) { type } }
     }
 
@@ -183,8 +197,9 @@ open class BinaryToAst(
             val sectionId = b.readVarUInt7().toInt()
             if (sectionId > 11) throw IoErr.InvalidSectionId(sectionId)
             if (sectionId != 0)
-                require(sectionId > maxSectionId) { "Section ID $sectionId came after $maxSectionId" }.
-                    also { maxSectionId = sectionId }
+                require(sectionId > maxSectionId) { "Section ID $sectionId came after $maxSectionId" }.also {
+                    maxSectionId = sectionId
+                }
             val sectionLen = b.readVarUInt32AsInt()
             sections += sectionId to b.read(sectionLen)
         }
@@ -192,6 +207,7 @@ open class BinaryToAst(
         // Now build the module
         fun <T> readSectionList(sectionId: Int, fn: (ByteReader) -> T) =
             sections.find { it.first == sectionId }?.second?.readList(fn) ?: emptyList()
+
         val types = readSectionList(1, this::toFuncType)
         val funcIndices = readSectionList(3) { it.readVarUInt32AsInt() }
         var nameSection: Node.NameSection? = null
@@ -204,9 +220,12 @@ open class BinaryToAst(
             exports = readSectionList(7, this::toExport),
             startFuncIndex = sections.find { it.first == 8 }?.second?.readVarUInt32AsInt(),
             elems = readSectionList(9, this::toElem),
-            funcs = readSectionList(10) { it }.
-                also { if (it.size != funcIndices.size) throw IoErr.InvalidCodeLength(funcIndices.size, it.size) }.
-                zip(funcIndices.map { types[it] }, this::toFunc),
+            funcs = readSectionList(10) { it }.also {
+                if (it.size != funcIndices.size) throw IoErr.InvalidCodeLength(
+                    funcIndices.size,
+                    it.size
+                )
+            }.zip(funcIndices.map { types[it] }, this::toFunc),
             data = readSectionList(11, this::toData),
             customSections = sections.foldIndexed(emptyList()) { index, customSections, (sectionId, b) ->
                 if (sectionId != 0) customSections else {
@@ -221,7 +240,9 @@ open class BinaryToAst(
                         !shouldParseNames || try {
                             nameSection = toNameSection(ByteReader.InputStream(section.payload.inputStream()))
                             false
-                        } catch (e: Exception) { warn { "Failed parsing name section: $e" }; true }
+                        } catch (e: Exception) {
+                            warn { "Failed parsing name section: $e" }; true
+                        }
                     }
                     if (section == null) customSections else customSections + section
                 }
@@ -251,9 +272,11 @@ open class BinaryToAst(
         // We have to use the decoder directly to get malformed-input errors
         Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(this.readBytes(it))).toString()
     }
+
     fun <T> ByteReader.readList(fn: (ByteReader) -> T) = this.readVarUInt32().let { listSize ->
         (0 until listSize).map { fn(this) }
     }
+
     fun ByteReader.readVarUInt32AsInt() = this.readVarUInt32().toIntExact()
 
     companion object : BinaryToAst()

@@ -1,9 +1,9 @@
 package eu.aylett.asmble.compile.jvm
 
-import eu.aylett.asmble.AsmErr
-import java.util.*
+import java.util.Arrays
 
-sealed class CompileErr(message: String, cause: Throwable? = null) : RuntimeException(message, cause),
+sealed class CompileErr(message: String, cause: Throwable? = null) :
+    RuntimeException(message, cause),
     eu.aylett.asmble.AsmErr {
 
     class StackMismatch(

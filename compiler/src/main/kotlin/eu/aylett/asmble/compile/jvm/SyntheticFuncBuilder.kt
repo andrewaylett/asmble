@@ -3,7 +3,15 @@ package eu.aylett.asmble.compile.jvm
 import eu.aylett.asmble.ast.Node
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.Opcodes
-import org.objectweb.asm.tree.*
+import org.objectweb.asm.tree.ClassNode
+import org.objectweb.asm.tree.InsnNode
+import org.objectweb.asm.tree.JumpInsnNode
+import org.objectweb.asm.tree.LabelNode
+import org.objectweb.asm.tree.MethodInsnNode
+import org.objectweb.asm.tree.MethodNode
+import org.objectweb.asm.tree.TableSwitchInsnNode
+import org.objectweb.asm.tree.TypeInsnNode
+import org.objectweb.asm.tree.VarInsnNode
 
 open class SyntheticFuncBuilder {
 
@@ -14,8 +22,10 @@ open class SyntheticFuncBuilder {
         // ASM does some annoying state manip even when just looping over instructions. For now,
         // none of the insns in the helper reference the "owner" so we don't have to change those.
         val runtimeHelpers = ClassNode().also {
-            ClassReader(eu.aylett.asmble.compile.jvm.RuntimeHelpers::class.java.name).
-                accept(it, ClassReader.SKIP_DEBUG and ClassReader.SKIP_FRAMES)
+            ClassReader(eu.aylett.asmble.compile.jvm.RuntimeHelpers::class.java.name).accept(
+                it,
+                ClassReader.SKIP_DEBUG and ClassReader.SKIP_FRAMES
+            )
         }
         val helperMeth = runtimeHelpers.methods.first { (it as MethodNode).name == "bootstrapIndirect" } as MethodNode
         return MethodNode(
@@ -33,12 +43,17 @@ open class SyntheticFuncBuilder {
         // The default will chain to another method if there are more to handle.
 
         // Build a bunch of chunk views...first of each is start, second is sub list
-        val chunks = (0 until Math.ceil(table.targetTable.size / ctx.jumpTableChunkSize.toDouble()).toInt()).
-            fold(emptyList<Pair<Int, List<Int>>>()) { chunks, chunkNum ->
-                val start = chunkNum * ctx.jumpTableChunkSize
-                chunks.plusElement(start to table.targetTable.subList(start,
-                    Math.min(table.targetTable.size, (chunkNum + 1) * ctx.jumpTableChunkSize)))
-            }
+        val chunks = (0 until Math.ceil(table.targetTable.size / ctx.jumpTableChunkSize.toDouble()).toInt()).fold(
+            emptyList<Pair<Int, List<Int>>>()
+        ) { chunks, chunkNum ->
+            val start = chunkNum * ctx.jumpTableChunkSize
+            chunks.plusElement(
+                start to table.targetTable.subList(
+                    start,
+                    Math.min(table.targetTable.size, (chunkNum + 1) * ctx.jumpTableChunkSize)
+                )
+            )
+        }
         // Go over the chunks, backwards, building the jump methods, then flip em back
         return chunks.asReversed().fold(emptyList<MethodNode>()) { methods, (start, chunk) ->
             val defaultLabel = LabelNode()
@@ -71,7 +86,8 @@ open class SyntheticFuncBuilder {
             "${namePrefix}_${startIndex}_until_${startIndex + targets.size}", "(I)I", null, null
         ).addInsns(
             VarInsnNode(Opcodes.ILOAD, 0),
-            TableSwitchInsnNode(startIndex, (startIndex + targets.size) - 1, defaultLabel,
+            TableSwitchInsnNode(
+                startIndex, (startIndex + targets.size) - 1, defaultLabel,
                 *targets.map { labelsByTargets.getOrPut(it) { LabelNode() } }.toTypedArray()
             )
         ).also { method ->
@@ -141,8 +157,8 @@ open class SyntheticFuncBuilder {
         MethodNode(
             Opcodes.ACC_PRIVATE + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
             name, "(F)V", null, null
-        ).floatNanCheck().floatRangeCheck(9223372036854775807f, -9223372036854775807f).
-            addInsns(InsnNode(Opcodes.RETURN))
+        ).floatNanCheck().floatRangeCheck(9223372036854775807f, -9223372036854775807f)
+            .addInsns(InsnNode(Opcodes.RETURN))
 
     fun buildF2ULAssertion(ctx: ClsContext, name: String) =
         MethodNode(
@@ -166,8 +182,8 @@ open class SyntheticFuncBuilder {
         MethodNode(
             Opcodes.ACC_PRIVATE + Opcodes.ACC_STATIC + Opcodes.ACC_SYNTHETIC,
             name, "(D)V", null, null
-        ).doubleNanCheck().doubleRangeCheck(9223372036854775807.0, -9223372036854775807.0).
-            addInsns(InsnNode(Opcodes.RETURN))
+        ).doubleNanCheck().doubleRangeCheck(9223372036854775807.0, -9223372036854775807.0)
+            .addInsns(InsnNode(Opcodes.RETURN))
 
     fun buildD2ULAssertion(ctx: ClsContext, name: String) =
         MethodNode(
@@ -257,8 +273,10 @@ open class SyntheticFuncBuilder {
         TypeInsnNode(Opcodes.NEW, ArithmeticException::class.ref.asmName),
         InsnNode(Opcodes.DUP),
         msg.const,
-        MethodInsnNode(Opcodes.INVOKESPECIAL, ArithmeticException::class.ref.asmName,
-            "<init>", "(Ljava/lang/String;)V", false),
+        MethodInsnNode(
+            Opcodes.INVOKESPECIAL, ArithmeticException::class.ref.asmName,
+            "<init>", "(Ljava/lang/String;)V", false
+        ),
         InsnNode(Opcodes.ATHROW)
     )
 
