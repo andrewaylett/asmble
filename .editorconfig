@@ -31,5 +31,5 @@ ij_continuation_indent_size = 4
 ij_kotlin_import_nested_classes = false
 ij_kotlin_imports_layout = *,^
 
-[*.yaml]
+[*.{yaml,yml}]
 indent_size = 2
