@@ -5,6 +5,7 @@ import eu.aylett.asmble.compile.jvm.AsmToBinary
 import eu.aylett.asmble.compile.jvm.AstToAsm
 import eu.aylett.asmble.compile.jvm.ClsContext
 import eu.aylett.asmble.io.BinaryToAst
+import org.junit.Assert
 import org.junit.Test
 import java.util.UUID
 
@@ -18,7 +19,7 @@ class LargeInitFuncTest : TestBase() {
             className = "Temp" + UUID.randomUUID().toString().replace("-", ""),
             logger = logger,
             // This was taken from the Rust Regex compile
-            mod = BinaryToAst.toModule(javaClass.getResource("/large-init-func-test.wasm").readBytes())
+            mod = BinaryToAst.toModule(javaClass.getResource("/large-init-func-test.wasm")!!.readBytes())
         )
         AstToAsm.fromModule(ctx)
         // Compile
@@ -28,6 +29,12 @@ class LargeInitFuncTest : TestBase() {
         }
         val cls = cl.defineClass("${ctx.packageName}.${ctx.className}", bytes)
         // Just make sure it can init
-        cls.declaredConstructors.first().newInstance(600 * 65536)
+        var instance: Any? = null
+        for (constructor in cls.declaredConstructors) {
+            if (constructor.parameters[0].type.isAssignableFrom(Int::class.java)) {
+                instance = constructor.newInstance(600 * 65536)
+            }
+        }
+        Assert.assertNotNull("Expected to initialise an instance", instance)
     }
 }
