@@ -1,6 +1,7 @@
 plugins {
     id("asmble.java-conventions")
     id("application")
+    id("asmble.publish-conventions")
 }
 
 application {

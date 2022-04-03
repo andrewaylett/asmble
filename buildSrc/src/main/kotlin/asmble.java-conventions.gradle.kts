@@ -1,3 +1,6 @@
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
 plugins {
     java
     kotlin("jvm")
@@ -6,7 +9,7 @@ plugins {
 }
 
 group = "eu.aylett.asmble"
-version = "1.0"
+version = "1.0." + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
 
 repositories {
     mavenCentral()
