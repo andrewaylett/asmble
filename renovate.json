@@ -1,5 +1,20 @@
 {
-    "extends": [
-        "config:base"
-    ]
+  "extends": [
+    "config:base"
+  ],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "automergeType": "branch"
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "automergeType": "branch"
+  },
+  "prConcurrentLimit": 2,
+  "branchConcurrentLimit": 4
 }
