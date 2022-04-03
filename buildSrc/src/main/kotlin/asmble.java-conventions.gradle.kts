@@ -2,6 +2,7 @@ plugins {
     java
     kotlin("jvm")
     id("com.diffplug.spotless")
+    id("org.jetbrains.qodana")
 }
 
 group = "eu.aylett.asmble"
@@ -9,23 +10,48 @@ version = "1.0"
 
 repositories {
     mavenCentral()
+    google()
 }
 
 dependencyLocking {
     lockAllConfigurations()
 }
 
+var kotlinRequire="1.6.+"
+var junitJupiterRequire="5.+"
+
 dependencies {
-    testImplementation("junit", "junit")
+    testImplementation("org.junit.jupiter","junit-jupiter")
+    testCompileOnly("junit","junit")
+    testRuntimeOnly("org.junit.vintage","junit-vintage-engine")
+
     testImplementation("org.jetbrains.kotlin", "kotlin-test-junit")
+
     constraints {
+        implementation("org.jetbrains.kotlin", "kotlin-stdlib") {
+            version { require(kotlinRequire) }
+        }
+        implementation("org.jetbrains.kotlin", "kotlin-reflect") {
+            version { require(kotlinRequire) }
+        }
+
+        testImplementation("org.junit.jupiter","junit-jupiter") {
+            version { require(junitJupiterRequire) }
+        }
+        testRuntimeOnly("org.junit.vintage","junit-vintage-engine") {
+            version { require(junitJupiterRequire) }
+        }
         testImplementation("junit", "junit") {
             version { require("4.+") }
         }
         testImplementation("org.jetbrains.kotlin", "kotlin-test-junit") {
-            version { require("1.6.+") }
+            version { require(kotlinRequire) }
         }
     }
+}
+
+tasks.named<Test>("test") {
+    useJUnitPlatform()
 }
 
 kotlin {

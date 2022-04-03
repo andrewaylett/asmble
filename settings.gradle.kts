@@ -7,6 +7,12 @@ plugins {
     id("com.gradle.enterprise") version ("3.9")
 }
 
+buildscript {
+    configurations.classpath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+}
+
 gradleEnterprise {
     buildScan {
         publishAlways()
