@@ -11,7 +11,6 @@ import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MethodNode
 import org.objectweb.asm.tree.TypeInsnNode
 import org.objectweb.asm.tree.VarInsnNode
-import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.reflect.KClass
@@ -31,7 +30,7 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
     override fun init(func: Func, initial: Int) = func.popExpecting(memType).addInsns(
         // Set the limit to initial
         (initial * Mem.PAGE_SIZE).const,
-        forceFnType<ByteBuffer.(Int) -> Buffer>(ByteBuffer::limit).invokeVirtual(),
+        forceFnType<ByteBuffer.(Int) -> ByteBuffer>(ByteBuffer::limit).invokeVirtual(),
         TypeInsnNode(Opcodes.CHECKCAST, ByteBuffer::class.ref.asmName),
         // Set it to use little endian
         ByteOrder::LITTLE_ENDIAN.getStatic(),
@@ -50,7 +49,7 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
         // Note, with this approach, the mem not be left on the stack for future data() calls which is fine.
         func.popExpecting(memType).addInsns(ByteBuffer::duplicate.invokeVirtual()).let(buildOffset)
             .popExpecting(Int::class.ref).addInsns(
-                forceFnType<ByteBuffer.(Int) -> Buffer>(ByteBuffer::position).invokeVirtual(),
+                forceFnType<ByteBuffer.(Int) -> ByteBuffer>(ByteBuffer::position).invokeVirtual(),
                 TypeInsnNode(Opcodes.CHECKCAST, memType.asmName)
             ).addInsns(
                 // We're going to do this as an LDC string in ISO-8859 and read it back at runtime. However,
@@ -118,7 +117,7 @@ open class ByteBufferMem(val direct: Boolean = true) : Mem {
                 InsnNode(Opcodes.IRETURN),
                 okLim, // [lim, mem, newlimL]
                 InsnNode(Opcodes.L2I), // [lim, mem, newlim]
-                forceFnType<ByteBuffer.(Int) -> Buffer>(ByteBuffer::limit).invokeVirtual(), // [lim, mem]
+                forceFnType<ByteBuffer.(Int) -> ByteBuffer>(ByteBuffer::limit).invokeVirtual(), // [lim, mem]
                 InsnNode(Opcodes.POP), // [lim]
                 Mem.PAGE_SIZE.const, // [lim, pagesize]
                 InsnNode(Opcodes.IDIV), // [limpages]
