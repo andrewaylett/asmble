@@ -2,6 +2,7 @@ rootProject.name = "asmble"
 include("annotations")
 include("compiler")
 include("cli")
+include("gradle-plugin")
 
 plugins {
     id("com.gradle.enterprise") version ("3.9")

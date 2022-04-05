@@ -20,7 +20,7 @@ dependencyLocking {
     lockAllConfigurations()
 }
 
-var kotlinRequire="1.6.+"
+var kotlinRequire="1.5.+"
 var junitJupiterRequire="5.+"
 
 dependencies {
