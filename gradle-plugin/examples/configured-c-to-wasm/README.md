@@ -6,7 +6,7 @@ This example illustrates two things:
 * how to configure the build to customize package name and class names,
   regardless of the WASM file name and location.
 
-See the [build.gradle](build.gradle) file for details.
+See the [build.gradle](build.gradle.kts) file for details.
 
 ## Requirements
 

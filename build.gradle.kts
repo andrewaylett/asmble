@@ -17,5 +17,6 @@ val processExamples: String = System.getProperty("eu.aylett.asmble.processExampl
 if (processExamples == "yes") {
     tasks.register("examples") {
         dependsOn(project.gradle.includedBuild("examples").task(":hello-world:run"))
+        dependsOn(project.gradle.includedBuild("examples").task(":configured-c-to-wasm:run"))
     }
 }
