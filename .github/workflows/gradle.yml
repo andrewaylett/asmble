@@ -41,3 +41,4 @@ jobs:
           --build-cache
           examples
           -Denterprise.tos.agree=yes
+          -Deu.aylett.asmble.processExamples=yes
