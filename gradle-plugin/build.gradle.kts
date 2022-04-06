@@ -6,7 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":compiler"))
-    testImplementation(project(":annotations"))
+    api(project(":annotations"))
 }
 
 gradlePlugin {

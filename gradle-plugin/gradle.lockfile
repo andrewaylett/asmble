@@ -46,4 +46,4 @@ org.ow2.asm:asm-commons:6.2.1=runtimeClasspath
 org.ow2.asm:asm-tree:6.2.1=compileClasspath,runtimeClasspath
 org.ow2.asm:asm-util:6.2.1=runtimeClasspath
 org.ow2.asm:asm:6.2.1=compileClasspath,runtimeClasspath
-empty=
+empty=annotationProcessor

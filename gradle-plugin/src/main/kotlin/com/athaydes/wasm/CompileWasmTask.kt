@@ -10,49 +10,29 @@ import eu.aylett.asmble.io.ByteReader
 import eu.aylett.asmble.io.SExprToAst
 import eu.aylett.asmble.io.StrToSExpr
 import eu.aylett.asmble.util.Logger
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileVisitDetails
 import org.gradle.api.logging.LogLevel
-import org.gradle.api.provider.MapProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.SourceTask
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.compile.AbstractCompile
 import java.io.File
 import java.io.FileOutputStream
 
-abstract class CompileWasmTask : SourceTask() {
+@CacheableTask
+abstract class CompileWasmTask : AbstractCompile() {
 
     private data class ClassName(val qualified: String, val simple: String, val packages: List<String>)
 
-    @get:Internal("Tracked by this.getSource")
-    val stableSources: FileCollection = project.files(this.source)
-
-    @get:Input
-    abstract val packageName: Property<String>
-
-    @get:Input
-    abstract val classNameByFile: MapProperty<String, String>
-
-    @get:OutputDirectory
-    abstract val outputDir: DirectoryProperty
-
     @TaskAction
     fun compile() {
-        outputDir.asFile.get().mkdirs()
-        stableSources.files.forEach { fileOrDirectory ->
-            val rootDirectory = if (fileOrDirectory.isDirectory) {
-                fileOrDirectory
-            } else {
-                project.projectDir
-            }
+        logger.debug("Compiling WASM to {}", destinationDirectory.get())
+        destinationDirectory.asFile.get().mkdirs()
+        this.source.files.forEach { fileOrDirectory ->
+            logger.info("Compiling WASM from {}", fileOrDirectory)
             project.fileTree(fileOrDirectory).visit {
                 if (it.isDirectory) return@visit
 
-                val className = resolvePkgAndClassName(it, rootDirectory)
+                val className = resolvePkgAndClassName(it)
                 val classFile = classFileFor(className)
 
                 classFile.parentFile?.mkdirs()
@@ -102,7 +82,7 @@ abstract class CompileWasmTask : SourceTask() {
                     (script.commands.firstOrNull() as? Script.Cmd.Module)
                         ?: error("Only a single sexpr for (module) allowed")
                 val outStream = FileOutputStream(classFile)
-                outStream.use {
+                outStream.use { out ->
                     val ctx = ClsContext(
                         packageName = className.packages.joinToString("."),
                         className = className.simple,
@@ -112,18 +92,14 @@ abstract class CompileWasmTask : SourceTask() {
                         includeBinary = false
                     )
                     AstToAsm.fromModule(ctx)
-                    it.write(AsmToBinary(logger = asmbleLogger).fromClassNode(ctx.cls))
+                    out.write(AsmToBinary(logger = asmbleLogger).fromClassNode(ctx.cls))
                 }
             }
         }
     }
 
-    private fun resolvePkgAndClassName(file: FileVisitDetails, rootDirectory: File): ClassName {
-        val relativeClassName = file.file.relativeTo(rootDirectory).path
-
-        val customName = classNameByFile.getting(relativeClassName)
-
-        val fullClassName = joinClassNameWithPkg(customName.get() ?: file.file.nameWithoutExtension)
+    private fun resolvePkgAndClassName(file: FileVisitDetails): ClassName {
+        val fullClassName = file.file.nameWithoutExtension
 
         val parts = fullClassName.split(".").filter { it.isNotBlank() }
         return ClassName(
@@ -133,13 +109,8 @@ abstract class CompileWasmTask : SourceTask() {
         )
     }
 
-    private fun joinClassNameWithPkg(name: String): String {
-        return if (packageName.get().isBlank()) name else
-            "${packageName.get()}.$name"
-    }
-
     private fun classFileFor(name: ClassName): File {
-        val dir = name.packages.fold(outputDir.get()) { acc, s -> acc.dir(s) }
+        val dir = name.packages.fold(destinationDirectory.get()) { acc, s -> acc.dir(s) }
         return dir.file("${name.simple}.class").asFile
     }
 }

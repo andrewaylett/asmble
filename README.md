@@ -3,6 +3,8 @@
 Asmble is a compiler that compiles [WebAssembly](http://webassembly.org/) code to JVM bytecode. It also contains an
 interpreter and utilities for working with WASM code from the command line and from JVM languages.
 
+This repository is a fork of the original, with many thanks to @cretz for Asmble itself and to @renatoathaydes for the original Gradle plugin implementation.
+
 ## Features
 
 * WASM to JVM bytecode compiler (no runtime required)
@@ -10,14 +12,9 @@ interpreter and utilities for working with WASM code from the command line and f
 * Conversion utilities between WASM binary, WASM text, and WASM AST
 * Programmatic JVM library for all of the above (written in Kotlin)
 * [Examples](examples) showing how to use other languages on the JVM via WASM (e.g. Rust)
+* Gradle plugin providing conventions for including WASM in your JVM build.
 
 ## Quick Start
-
-WebAssembly by itself does not have routines for printing to stdout or any external platform features. For this example
-we'll use the test harness used by the [spec](https://github.com/WebAssembly/spec/). Java 8 must be installed.
-
-Download the latest TAR/ZIP from the [releases](https://github.com/cretz/asmble/releases) area and extract it to
-`asmble/`.
 
 WebAssembly code is either in a [binary file](http://webassembly.org/docs/binary-encoding/) (i.e. `.wasm` files) or a
 [text file](http://webassembly.org/docs/text-format/) (i.e. `.wast` files). The following code imports the `print`
@@ -41,6 +38,21 @@ The result will be:
     70 : i32
 
 Which is how the test harness prints an integer. See the [examples](examples) directory for more examples.
+
+### Gradle Plugin
+
+You'll need to include the Gradle Plugin in your build:
+
+```
+plugins {
+    java
+    id("eu.aylett.asmble.gradle-plugin") version 1.0.20220406
+}
+```
+
+Place your WASM file in `src/main/wasm/` and it'll be included in your build.
+We automatically add the generated classes to the `implementation` classpath for the source set they're built from.
+Files with names of the format `package.name.clazz.wasm` will be transformed into classes located in the `package.name` package and themselves named `clazz`.
 
 ## CLI Usage
 
@@ -166,25 +178,34 @@ JVM languages.
 The compiler and annotations are deployed to Maven Central. The compiler is written in Kotlin and can be added as a
 Gradle dependency with:
 
-    compile 'com.github.cretz.asmble:asmble-compiler:0.3.0'
+    compile 'eu.aylett.asmble:asmble-compiler:0.3.0'
 
 This is only needed to compile of course, the compiled code has no runtime requirement. The compiled code does include
 some annotations (but in Java its ok to have annotations that are not found). If you do want to reflect the annotations,
 the annotation library can be added as a Gradle dependency with:
 
-    compile 'com.github.cretz.asmble:asmble-annotations:0.3.0'
+    compile 'eu.aylett.asmble:asmble-annotations:0.3.0'
 
 ### Building and Testing
 
 To manually build, clone the repository:
 
-    git clone --recursive https://github.com/cretz/asmble
+    git clone --recursive https://github.com/andrewaylett/asmble
 
-The reason we use recursive is to clone the spec submodule we have embedded at `src/test/resources/spec`. Unlike many
-Gradle projects, this project chooses not to embed the Gradle runtime library in the repository. To assemble the entire
-project with [Gradle](https://gradle.org/) installed and on the `PATH` (tested with 4.6), run:
+The reason we use recursive is to clone the spec submodule we have embedded at `src/test/resources/spec`.
+Unlike our upstream, we embed the Gradle wrapper in the repository.
+To assemble the entire project, run:
 
-    gradle :compiler:assembleDist
+    ./gradlew build
+
+If you want to build and execute all the examples then you're probably going to need some further dependencies.
+The projects depend on being able to find `clang` and a nightly Rust that's configured for wasm.
+
+Enable the examples, build and run, by setting a system property and running the `examples` task:
+
+    ./gradlew examples -Deu.aylett.asmble.processExamples=yes
+
+Gradle Enterprise build scans will not be generated when examples are enabled.
 
 ### Library Notes
 

@@ -34,3 +34,10 @@ jobs:
           --build-cache
           build
           -Denterprise.tos.agree=yes
+    - name: Run the examples
+      uses: gradle/gradle-build-action@0d13054264b0bb894ded474f08ebb30921341cee
+      with:
+        arguments: |
+          --build-cache
+          examples
+          -Denterprise.tos.agree=yes

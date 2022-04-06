@@ -11,3 +11,11 @@ buildscript {
         resolutionStrategy.activateDependencyLocking()
     }
 }
+
+val processExamples: String = System.getProperty("eu.aylett.asmble.processExamples", "no")
+
+if (processExamples == "yes") {
+    tasks.register("examples") {
+        dependsOn(project.gradle.includedBuild("examples").task(":hello-world:run"))
+    }
+}
