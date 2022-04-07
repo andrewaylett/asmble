@@ -29,14 +29,14 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
     - name: Build with Gradle
-      uses: gradle/gradle-build-action@0d13054264b0bb894ded474f08ebb30921341cee
+      uses: gradle/gradle-build-action@9230b19200b55ef437d00053112315442661a5bc
       with:
         arguments: |
           --build-cache
           build
           -Denterprise.tos.agree=yes
     - name: Run the examples
-      uses: gradle/gradle-build-action@0d13054264b0bb894ded474f08ebb30921341cee
+      uses: gradle/gradle-build-action@9230b19200b55ef437d00053112315442661a5bc
       with:
         arguments: |
           --build-cache
