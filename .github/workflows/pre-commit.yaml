@@ -18,4 +18,4 @@ jobs:
           distribution: 'temurin'
       - name: Build with Gradle
         uses: gradle/gradle-build-action@9230b19200b55ef437d00053112315442661a5bc
-      - uses: pre-commit/action@v2.0.2
+      - uses: pre-commit/action@v2.0.3
